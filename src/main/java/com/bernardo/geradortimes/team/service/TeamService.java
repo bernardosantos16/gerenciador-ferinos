@@ -1,0 +1,409 @@
+package com.bernardo.geradortimes.team.service;
+
+import com.bernardo.geradortimes.club.model.ClubMember;
+import com.bernardo.geradortimes.club.repository.ClubMemberRepository;
+import com.bernardo.geradortimes.club.service.ClubAuthorizationService;
+import com.bernardo.geradortimes.shared.enums.MatchParticipantPosition;
+import com.bernardo.geradortimes.match.model.Match;
+import com.bernardo.geradortimes.match.model.MatchParticipant;
+import com.bernardo.geradortimes.match.repository.MatchParticipantRepository;
+import com.bernardo.geradortimes.match.repository.MatchRepository;
+import com.bernardo.geradortimes.team.dto.request.CreateTeamRequestDTO;
+import com.bernardo.geradortimes.team.dto.request.GenerateTeamsRequestDTO;
+import com.bernardo.geradortimes.team.dto.request.UpdateTeamJerseyRequestDTO;
+import com.bernardo.geradortimes.team.dto.response.GenerateTeamsResponseDTO;
+import com.bernardo.geradortimes.team.dto.response.GeneratedTeamDTO;
+import com.bernardo.geradortimes.team.dto.response.TeamResponseDTO;
+import com.bernardo.geradortimes.team.model.Team;
+import com.bernardo.geradortimes.team.repository.TeamRepository;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
+
+import static org.springframework.http.HttpStatus.NOT_FOUND;
+import static org.springframework.http.HttpStatus.BAD_REQUEST;
+
+@Service
+@Transactional
+@Slf4j
+public class TeamService {
+
+    private final TeamRepository teamRepository;
+    private final ClubMemberRepository clubMemberRepository;
+    private final MatchParticipantRepository matchParticipantRepository;
+    private final MatchRepository matchRepository;
+    private final ClubAuthorizationService clubAuthorizationService;
+
+    public TeamService(
+            TeamRepository teamRepository,
+            ClubMemberRepository clubMemberRepository,
+            MatchParticipantRepository matchParticipantRepository,
+            MatchRepository matchRepository,
+            ClubAuthorizationService clubAuthorizationService
+    ) {
+        this.teamRepository = teamRepository;
+        this.clubMemberRepository = clubMemberRepository;
+        this.matchParticipantRepository = matchParticipantRepository;
+        this.matchRepository = matchRepository;
+        this.clubAuthorizationService = clubAuthorizationService;
+    }
+
+    public TeamResponseDTO create(CreateTeamRequestDTO request) {
+        Team team = Team.create(request.matchId(), request.clubJerseyId());
+        Team saved = teamRepository.save(team);
+        return toResponse(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public TeamResponseDTO getById(Long id) {
+        Team team = teamRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "team not found"));
+        return toResponse(team);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TeamResponseDTO> list(UUID matchId) {
+        List<Team> teams = matchId == null
+                ? teamRepository.findAll()
+                : teamRepository.findByMatchId(matchId);
+        return teams.stream().map(TeamService::toResponse).toList();
+    }
+
+    public TeamResponseDTO updateJersey(Long id, UpdateTeamJerseyRequestDTO request) {
+        Team team = teamRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "team not found"));
+        team.changeJersey(request.clubJerseyId());
+        return toResponse(team);
+    }
+
+    public GenerateTeamsResponseDTO generate(GenerateTeamsRequestDTO request) {
+        UUID matchId = request.matchId();
+        List<Long> lineIds = request.lineMemberIds() == null ? List.of() : request.lineMemberIds();
+        List<Long> goalkeeperIds = request.goalkeeperMemberIds() == null ? List.of() : request.goalkeeperMemberIds();
+        int maxLinePlayers = request.maxLinePlayers() == null ? 0 : request.maxLinePlayers();
+        log.info(
+                "geracao times requisitada matchId={} lineIds={} goalkeeperIds={} maxLinePlayers={}",
+                matchId,
+                lineIds.size(),
+                goalkeeperIds.size(),
+                maxLinePlayers
+        );
+
+        Match match = matchRepository.findById(matchId)
+                .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "match not found: " + matchId));
+        clubAuthorizationService.requireDirector(match.getClubId());
+
+        if (maxLinePlayers < 1) {
+            throw new ResponseStatusException(BAD_REQUEST, "maxLinePlayers must be >= 1");
+        }
+        if (lineIds.size() < 2) {
+            throw new ResponseStatusException(BAD_REQUEST, "lineMemberIds must contain at least 2 members");
+        }
+
+        List<Long> normalizedLineIds = normalizeIds(lineIds, "lineMemberIds");
+        List<Long> normalizedGoalkeeperIds = normalizeIds(goalkeeperIds, "goalkeeperMemberIds");
+
+        Set<Long> overlap = new HashSet<>(normalizedLineIds);
+        overlap.retainAll(normalizedGoalkeeperIds);
+        if (!overlap.isEmpty()) {
+            throw new ResponseStatusException(BAD_REQUEST, "a member cannot be both LINE and GOAL for the same match");
+        }
+
+        Map<Long, ClubMember> membersById = loadMembersById(union(normalizedLineIds, normalizedGoalkeeperIds));
+        List<ClubMember> lineMembers = normalizedLineIds.stream().map(membersById::get).toList();
+        List<ClubMember> goalkeeperMembers = normalizedGoalkeeperIds.stream().map(membersById::get).toList();
+
+        int teamCount = computeTeamCount(lineMembers.size(), maxLinePlayers);
+        List<Integer> teamSizes = computeTeamSizes(lineMembers.size(), teamCount);
+
+        // Replace any previously generated data for this match.
+        matchParticipantRepository.deleteByMatchId(matchId);
+        teamRepository.deleteByMatchId(matchId);
+
+        List<Team> teams = new ArrayList<>(teamCount);
+        for (int i = 0; i < teamCount; i++) {
+            teams.add(Team.create(matchId, null));
+        }
+        List<Team> savedTeams = teamRepository.saveAll(teams);
+
+        List<ScoredMember> scoredLineMembers = scoreMembers(lineMembers);
+        scoredLineMembers.sort(Comparator
+                .comparingDouble(ScoredMember::score).reversed()
+                .thenComparingLong(ScoredMember::memberId));
+
+        List<TeamBucket> buckets = new ArrayList<>(teamCount);
+        for (int i = 0; i < teamCount; i++) {
+            buckets.add(new TeamBucket(savedTeams.get(i).getId(), teamSizes.get(i)));
+        }
+
+        for (ScoredMember m : scoredLineMembers) {
+            TeamBucket bucket = pickBucketForNextPlayer(buckets);
+            bucket.addLine(m);
+        }
+
+        List<Long> unassignedGoalkeepers = new ArrayList<>();
+
+        if (goalkeeperMembers.size() == teamCount) {
+            List<ScoredMember> scoredKeepers = scoreMembers(goalkeeperMembers);
+            scoredKeepers.sort(Comparator
+                    .comparingDouble(ScoredMember::score).reversed()
+                    .thenComparingLong(ScoredMember::memberId));
+
+            // Assign strongest keepers to currently weakest teams.
+            Set<Long> availableTeamIds = new HashSet<>();
+            for (TeamBucket b : buckets) {
+                availableTeamIds.add(b.teamId);
+            }
+            for (ScoredMember keeper : scoredKeepers) {
+                TeamBucket weakest = buckets.stream()
+                        .filter(b -> availableTeamIds.contains(b.teamId))
+                        .min(Comparator.comparingDouble(
+                                TeamBucket::totalScore)
+                                .thenComparingLong(b -> b.teamId)
+                        )
+                        .orElseThrow();
+                weakest.assignGoalkeeper(keeper);
+                availableTeamIds.remove(weakest.teamId);
+            }
+
+        } else {
+            for (ClubMember gk : goalkeeperMembers) {
+                unassignedGoalkeepers.add(gk.getId());
+            }
+        }
+
+        // Persist participants (confirmation + team assignment if applicable).
+        List<MatchParticipant> participants = new ArrayList<>(
+                lineMembers.size() + goalkeeperMembers.size()
+        );
+
+        for (TeamBucket b : buckets) {
+            for (ScoredMember m : b.lineMembers) {
+                participants.add(MatchParticipant.create(
+                        matchId,
+                        m.memberId,
+                        MatchParticipantPosition.LINE,
+                        b.teamId
+                ));
+            }
+            if (b.goalkeeperMemberId != null) {
+                participants.add(MatchParticipant.create(
+                        matchId,
+                        b.goalkeeperMemberId,
+                        MatchParticipantPosition.GOAL,
+                        b.teamId
+                ));
+            }
+        }
+
+        for (Long gkId : unassignedGoalkeepers) {
+            participants.add(MatchParticipant.create(
+                    matchId,
+                    gkId,
+                    MatchParticipantPosition.GOAL,
+                    null
+            ));
+        }
+
+        matchParticipantRepository.saveAll(participants);
+
+        List<GeneratedTeamDTO> generatedTeams = buckets.stream()
+                .map(b -> new GeneratedTeamDTO(
+                        b.teamId,
+                        b.lineMembers.stream().map(x -> x.memberId).toList(),
+                        b.goalkeeperMemberId
+                ))
+                .toList();
+
+        log.info(
+                "geracao times concluida matchId={} teamCount={} unassignedGoalkeepers={}",
+                matchId,
+                teamCount,
+                unassignedGoalkeepers.size()
+        );
+        return new GenerateTeamsResponseDTO(matchId, teamCount, generatedTeams, unassignedGoalkeepers);
+    }
+
+    public void delete(Long id) {
+        if (!teamRepository.existsById(id)) {
+            throw new ResponseStatusException(NOT_FOUND, "team not found");
+        }
+        teamRepository.deleteById(id);
+    }
+
+    private static TeamResponseDTO toResponse(Team team) {
+        return new TeamResponseDTO(team.getId(), team.getMatchId(), team.getClubJerseyId());
+    }
+
+    private static List<Long> normalizeIds(List<Long> ids, String fieldName) {
+        if (ids == null) {
+            return List.of();
+        }
+        List<Long> normalized = ids.stream().filter(Objects::nonNull).toList();
+        if (normalized.size() != ids.size()) {
+            throw new ResponseStatusException(BAD_REQUEST, fieldName + " cannot contain nulls");
+        }
+        Set<Long> unique = new HashSet<>(normalized);
+        if (unique.size() != normalized.size()) {
+            throw new ResponseStatusException(BAD_REQUEST, fieldName + " cannot contain duplicates");
+        }
+        return normalized;
+    }
+
+    private Map<Long, ClubMember> loadMembersById(List<Long> ids) {
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        List<ClubMember> found = clubMemberRepository.findAllById(ids);
+        Map<Long, ClubMember> byId = new HashMap<>();
+        for (ClubMember m : found) {
+            byId.put(m.getId(), m);
+        }
+
+        List<Long> missing = ids.stream().filter(id -> !byId.containsKey(id)).toList();
+        if (!missing.isEmpty()) {
+            throw new ResponseStatusException(BAD_REQUEST, "club members not found: " + missing);
+        }
+        return byId;
+    }
+
+    private static List<Long> union(List<Long> a, List<Long> b) {
+        if (a.isEmpty()) return b;
+        if (b.isEmpty()) return a;
+        List<Long> out = new ArrayList<>(a.size() + b.size());
+        out.addAll(a);
+        out.addAll(b);
+        return out;
+    }
+
+    private static int computeTeamCount(int lineCount, int maxLinePlayers) {
+        if (lineCount < 2) {
+            throw new ResponseStatusException(BAD_REQUEST, "need at least 2 line players");
+        }
+        // Align with the examples: 15 with max 5 => 3 teams; 16 with max 5 => 3 teams (6/5/5).
+        int byRounding = Math.round((float) lineCount / (float) maxLinePlayers);
+        return Math.max(2, Math.max(1, byRounding));
+    }
+
+    private static List<Integer> computeTeamSizes(int lineCount, int teamCount) {
+        int base = lineCount / teamCount;
+        int remainder = lineCount % teamCount;
+        List<Integer> sizes = new ArrayList<>(teamCount);
+        for (int i = 0; i < teamCount; i++) {
+            sizes.add(base + (i < remainder ? 1 : 0));
+        }
+        return sizes;
+    }
+
+    private static List<ScoredMember> scoreMembers(List<ClubMember> members) {
+        if (members.isEmpty()) {
+            return List.of();
+        }
+
+        int minRating = Integer.MAX_VALUE, maxRating = Integer.MIN_VALUE;
+        int minChampion = Integer.MAX_VALUE, maxChampion = Integer.MIN_VALUE;
+        int minMvp = Integer.MAX_VALUE, maxMvp = Integer.MIN_VALUE;
+
+        for (ClubMember m : members) {
+            int rating = safeInt(m.getRating());
+            int champion = safeInt(m.getTimesChampion());
+            int mvp = safeInt(m.getTimesMvp());
+
+            minRating = Math.min(minRating, rating);
+            maxRating = Math.max(maxRating, rating);
+            minChampion = Math.min(minChampion, champion);
+            maxChampion = Math.max(maxChampion, champion);
+            minMvp = Math.min(minMvp, mvp);
+            maxMvp = Math.max(maxMvp, mvp);
+        }
+
+        double ratingDen = (maxRating - minRating);
+        double champDen = (maxChampion - minChampion);
+        double mvpDen = (maxMvp - minMvp);
+
+        List<ScoredMember> scored = new ArrayList<>(members.size());
+        for (ClubMember m : members) {
+            int rating = safeInt(m.getRating());
+            int champion = safeInt(m.getTimesChampion());
+            int mvp = safeInt(m.getTimesMvp());
+
+            double normRating = ratingDen == 0 ? 0.0 : ((double) (rating - minRating) / ratingDen);
+            double normChampion = champDen == 0 ? 0.0 : ((double) (champion - minChampion) / champDen);
+            double normMvp = mvpDen == 0 ? 0.0 : ((double) (mvp - minMvp) / mvpDen);
+
+            double score = normRating + normChampion + normMvp;
+            scored.add(new ScoredMember(m.getId(), score));
+        }
+        return scored;
+    }
+
+    private static int safeInt(Integer v) {
+        return v == null ? 0 : v;
+    }
+
+    private static TeamBucket pickBucketForNextPlayer(List<TeamBucket> buckets) {
+        return buckets.stream()
+                .filter(b -> !b.isFull())
+                .min(Comparator
+                        .comparingDouble(TeamBucket::totalScore)
+                        .thenComparingInt(TeamBucket::size)
+                        .thenComparingLong(b -> b.teamId)
+                )
+                .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "not enough buckets to place members"));
+    }
+
+    private record ScoredMember(long memberId, double score) {
+    }
+
+    private static final class TeamBucket {
+        private final long teamId;
+        private final int targetSize;
+        private final List<ScoredMember> lineMembers = new ArrayList<>();
+        private double totalScore;
+        private Long goalkeeperMemberId;
+
+        private TeamBucket(long teamId, int targetSize) {
+            this.teamId = teamId;
+            this.targetSize = targetSize;
+        }
+
+        private boolean isFull() {
+            return lineMembers.size() >= targetSize;
+        }
+
+        private int size() {
+            return lineMembers.size();
+        }
+
+        private double totalScore() {
+            return totalScore;
+        }
+
+        private void addLine(ScoredMember m) {
+            if (isFull()) {
+                throw new IllegalStateException("bucket is full");
+            }
+            lineMembers.add(m);
+            totalScore += m.score();
+        }
+
+        private void assignGoalkeeper(ScoredMember keeper) {
+            if (this.goalkeeperMemberId != null) {
+                throw new IllegalStateException("goalkeeper already assigned");
+            }
+            this.goalkeeperMemberId = keeper.memberId();
+            totalScore += keeper.score();
+        }
+    }
+}

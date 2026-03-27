@@ -1,0 +1,29 @@
+package com.bernardo.geradortimes.auth.dto.request;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
+public record LoginRequestDTO(
+        @Schema(
+                description = "Login do usuario (email).",
+                example = "user@example.com",
+                maxLength = 100
+        )
+        @NotBlank
+        @Size(max = 100)
+        @Email
+        String login,
+
+        @Schema(
+                description = "Senha em texto puro. Minimo 8 e maximo 72 caracteres.",
+                example = "S3nh4F0rt3!",
+                minLength = 8,
+                maxLength = 72
+        )
+        @NotBlank
+        @Size(min = 8, max = 72)
+        String password
+) {
+}
