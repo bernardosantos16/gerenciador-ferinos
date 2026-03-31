@@ -8,8 +8,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class Argon2PasswordService implements PasswordService {
 
-
-    private static final String argonPepper = "ydmkuTIJ1ga6SQ7c";
+    @Value("${argon.hash.pepper}")
+    private String argonPepper;
 
     @Override
     public String hash(String rawPassword) {
@@ -17,12 +17,12 @@ public class Argon2PasswordService implements PasswordService {
             throw new IllegalArgumentException("password is required");
         }
 
-        Argon2 argon2 = Argon2Factory.create();
+        Argon2 argon2 = Argon2Factory.create(Argon2Factory.Argon2Types.ARGON2id, 46, 46);
         String pepperPassword = rawPassword.concat(argonPepper);
         char[] passwordChars = pepperPassword.toCharArray();
         try {
             // Baseline parameters. Tune as needed.
-            return argon2.hash(3, 1 << 16, 1, passwordChars);
+            return argon2.hash(3, 1 << 16, 4, passwordChars);
         } finally {
             argon2.wipeArray(passwordChars);
         }
