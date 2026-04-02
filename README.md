@@ -42,6 +42,12 @@ Recomendadas (com default em `application.properties`):
 - `JWT_REFRESH_TTL` (default: `30d`)
 - `JWT_REFRESH_SALT` (default: `dev-refresh-salt-change-me`)
 
+### Supabase
+Para usar Supabase, configure as variaveis abaixo (elas tem prioridade sobre `JDBC_URL/POSTGRES_*`):
+- `SUPABASE_JDBC_URL` (ex.: `jdbc:postgresql://db.<project-ref>.supabase.co:5432/postgres?sslmode=require`)
+- `SUPABASE_DB_USER` (normalmente `postgres`)
+- `SUPABASE_DB_PASSWORD`
+
 ## Rodando localmente
 ```bash
 ./mvnw spring-boot:run

@@ -24,6 +24,10 @@ public class JwtService {
         if (props.secret() == null || props.secret().isBlank()) {
             throw new IllegalStateException("Missing JWT secret. Configure auth.jwt.secret");
         }
+        if (props.secret().length() < 32) {
+            throw new IllegalStateException("JWT secret must be at least 32 chars");
+        }
+
         String issuer = (props.issuer() == null || props.issuer().isBlank()) ? "geradortimes" : props.issuer();
         this.algorithm = Algorithm.HMAC256(props.secret());
         this.verifier = JWT.require(algorithm).withIssuer(issuer).build();
