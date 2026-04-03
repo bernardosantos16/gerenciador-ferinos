@@ -5,11 +5,15 @@ import com.bernardo.geradortimes.shared.value_object.Nickname;
 import com.bernardo.geradortimes.shared.value_object.PasswordHash;
 import com.bernardo.geradortimes.shared.api.FieldValidationException;
 import com.bernardo.geradortimes.shared.security.PasswordService;
+import com.bernardo.geradortimes.auth.security.CurrentUserService;
 import com.bernardo.geradortimes.user.dto.request.CreateUserRequestDTO;
 import com.bernardo.geradortimes.user.dto.response.UserResponseDTO;
 import com.bernardo.geradortimes.user.model.User;
 import com.bernardo.geradortimes.user.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -18,6 +22,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.springframework.http.HttpStatus.CONFLICT;
+import static org.springframework.http.HttpStatus.FORBIDDEN;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 @Slf4j
@@ -27,10 +32,12 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordService passwordService;
+    private final CurrentUserService currentUserService;
 
-    public UserService(UserRepository userRepository, PasswordService passwordService) {
+    public UserService(UserRepository userRepository, PasswordService passwordService, CurrentUserService currentUserService) {
         this.userRepository = userRepository;
         this.passwordService = passwordService;
+        this.currentUserService = currentUserService;
     }
 
     public UserResponseDTO create(CreateUserRequestDTO request) {
@@ -38,11 +45,11 @@ public class UserService {
         String loginRaw = request.login() == null ? null : request.login().trim();
 
         if (userRepository.existsByNickname_Value(nicknameRaw)) {
-            log.error("Erro ao criar no usuário - nickname {} já é utilizado", nicknameRaw);
+            log.warn("Erro ao criar usuario - nickname ja utilizado");
             throw new FieldValidationException(CONFLICT, "nickname", "nickname already exists");
         }
         if (userRepository.existsByLogin_Value(loginRaw)) {
-            log.error("Erro ao criar no usuário - login {} já é utilizado", loginRaw);
+            log.warn("Erro ao criar usuario - login ja utilizado");
             throw new FieldValidationException(CONFLICT, "login", "login already exists");
         }
 
@@ -58,17 +65,36 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public UserResponseDTO getById(UUID id) {
+        UUID currentId = currentUserService.requireUserId();
+        if (!currentId.equals(id) && !currentUserService.isAdmin()) {
+            throw new ResponseStatusException(FORBIDDEN, "forbidden");
+        }
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "user not found"));
         return toResponse(user);
     }
 
     @Transactional(readOnly = true)
-    public List<UserResponseDTO> list() {
-        return userRepository.findAll().stream().map(UserService::toResponse).toList();
+    public Page<UserResponseDTO> list(Pageable pageable) {
+        if (currentUserService.isAdmin()) {
+            return userRepository.findAll(pageable).map(UserService::toResponse);
+        }
+        UUID currentId = currentUserService.requireUserId();
+        User user = userRepository.findById(currentId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "user not found"));
+        List<UserResponseDTO> content = List.of(toResponse(user));
+        long total = 1;
+        if (pageable.getOffset() >= total) {
+            return Page.empty(pageable);
+        }
+        return new PageImpl<>(content, pageable, total);
     }
 
     public void delete(UUID id) {
+        UUID currentId = currentUserService.requireUserId();
+        if (!currentId.equals(id) && !currentUserService.isAdmin()) {
+            throw new ResponseStatusException(FORBIDDEN, "forbidden");
+        }
         if (!userRepository.existsById(id)) {
             throw new ResponseStatusException(NOT_FOUND, "user not found");
         }

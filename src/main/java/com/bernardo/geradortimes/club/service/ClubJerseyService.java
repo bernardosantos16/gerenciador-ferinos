@@ -5,11 +5,12 @@ import com.bernardo.geradortimes.club.dto.response.ClubJerseyResponseDTO;
 import com.bernardo.geradortimes.club.model.ClubJersey;
 import com.bernardo.geradortimes.club.repository.ClubJerseyRepository;
 import com.bernardo.geradortimes.shared.value_object.HexColor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.List;
 import java.util.UUID;
 
 import static org.springframework.http.HttpStatus.NOT_FOUND;
@@ -39,9 +40,9 @@ public class ClubJerseyService {
     }
 
     @Transactional(readOnly = true)
-    public List<ClubJerseyResponseDTO> listByClub(UUID clubId) {
+    public Page<ClubJerseyResponseDTO> listByClub(UUID clubId, Pageable pageable) {
         clubAuthorizationService.requireMember(clubId);
-        return clubJerseyRepository.findByClubId(clubId).stream().map(ClubJerseyService::toResponse).toList();
+        return clubJerseyRepository.findByClubId(clubId, pageable).map(ClubJerseyService::toResponse);
     }
 
     public void delete(UUID clubId, Long jerseyId) {

@@ -2,6 +2,7 @@ package com.bernardo.geradortimes.auth.security;
 
 import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.auth0.jwt.interfaces.DecodedJWT;
+import com.bernardo.geradortimes.shared.enums.UserRole;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -41,7 +42,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             UUID userId = UUID.fromString(jwt.getSubject());
             String login = jwt.getClaim("login").asString();
-            UserPrincipal principal = new UserPrincipal(userId, login);
+            String roleValue = jwt.getClaim("role").asString();
+            UserRole role = roleValue == null ? UserRole.USER : UserRole.valueOf(roleValue);
+            UserPrincipal principal = new UserPrincipal(userId, login, role);
 
             UsernamePasswordAuthenticationToken authentication =
                     new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
@@ -54,4 +57,3 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
     }
 }
-

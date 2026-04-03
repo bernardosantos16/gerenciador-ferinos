@@ -13,6 +13,9 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
@@ -26,7 +29,6 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -72,11 +74,12 @@ public class ClubJerseyController {
             @ApiResponse(responseCode = "403", description = "Usuario nao possui permissao (MEMBER requerido).",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
-    public List<ClubJerseyResponseDTO> list(
+    public Page<ClubJerseyResponseDTO> list(
             @Parameter(description = "ID do clube.", required = true, example = "c0a8012e-6f1f-4b4b-9f5e-7a8b9c0d1e2f")
-            @PathVariable UUID clubId
+            @PathVariable UUID clubId,
+            @PageableDefault(size = 50) Pageable pageable
     ) {
-        return clubJerseyService.listByClub(clubId);
+        return clubJerseyService.listByClub(clubId, pageable);
     }
 
     @DeleteMapping("/{jerseyId}")

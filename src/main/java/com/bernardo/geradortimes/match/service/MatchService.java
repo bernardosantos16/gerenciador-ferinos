@@ -10,6 +10,8 @@ import com.bernardo.geradortimes.match.repository.MatchParticipantRepository;
 import com.bernardo.geradortimes.match.repository.MatchRepository;
 import com.bernardo.geradortimes.team.repository.TeamRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -59,9 +61,9 @@ public class MatchService {
     }
 
     @Transactional(readOnly = true)
-    public List<MatchResponseDTO> listByClub(UUID clubId) {
+    public Page<MatchResponseDTO> listByClub(UUID clubId, Pageable pageable) {
         clubAuthorizationService.requireMember(clubId);
-        return matchRepository.findByClubId(clubId).stream().map(MatchService::toResponse).toList();
+        return matchRepository.findByClubId(clubId, pageable).map(MatchService::toResponse);
     }
 
     @Transactional(readOnly = true)
@@ -100,4 +102,3 @@ public class MatchService {
         );
     }
 }
-

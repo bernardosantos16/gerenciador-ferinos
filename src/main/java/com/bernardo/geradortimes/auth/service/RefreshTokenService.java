@@ -36,6 +36,9 @@ public class RefreshTokenService {
         if (refreshTokenSalt == null || refreshTokenSalt.isBlank()) {
             throw new IllegalStateException("auth.jwt.refresh-token-salt must be configured");
         }
+        if (refreshTokenSalt.length() < 32) {
+            throw new IllegalStateException("auth.jwt.refresh-token-salt must be at least 32 characters");
+        }
     }
 
     public String issue(UUID userId) {

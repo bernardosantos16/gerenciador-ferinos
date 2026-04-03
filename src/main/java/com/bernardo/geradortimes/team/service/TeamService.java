@@ -1,7 +1,9 @@
 package com.bernardo.geradortimes.team.service;
 
 import com.bernardo.geradortimes.club.model.ClubMember;
+import com.bernardo.geradortimes.club.model.ClubJersey;
 import com.bernardo.geradortimes.club.repository.ClubMemberRepository;
+import com.bernardo.geradortimes.club.repository.ClubJerseyRepository;
 import com.bernardo.geradortimes.club.service.ClubAuthorizationService;
 import com.bernardo.geradortimes.shared.enums.MatchParticipantPosition;
 import com.bernardo.geradortimes.match.model.Match;
@@ -17,6 +19,8 @@ import com.bernardo.geradortimes.team.dto.response.TeamResponseDTO;
 import com.bernardo.geradortimes.team.model.Team;
 import com.bernardo.geradortimes.team.repository.TeamRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -41,6 +45,7 @@ public class TeamService {
 
     private final TeamRepository teamRepository;
     private final ClubMemberRepository clubMemberRepository;
+    private final ClubJerseyRepository clubJerseyRepository;
     private final MatchParticipantRepository matchParticipantRepository;
     private final MatchRepository matchRepository;
     private final ClubAuthorizationService clubAuthorizationService;
@@ -48,18 +53,23 @@ public class TeamService {
     public TeamService(
             TeamRepository teamRepository,
             ClubMemberRepository clubMemberRepository,
+            ClubJerseyRepository clubJerseyRepository,
             MatchParticipantRepository matchParticipantRepository,
             MatchRepository matchRepository,
             ClubAuthorizationService clubAuthorizationService
     ) {
         this.teamRepository = teamRepository;
         this.clubMemberRepository = clubMemberRepository;
+        this.clubJerseyRepository = clubJerseyRepository;
         this.matchParticipantRepository = matchParticipantRepository;
         this.matchRepository = matchRepository;
         this.clubAuthorizationService = clubAuthorizationService;
     }
 
     public TeamResponseDTO create(CreateTeamRequestDTO request) {
+        Match match = requireMatch(request.matchId());
+        clubAuthorizationService.requireDirector(match.getClubId());
+        validateJersey(match.getClubId(), request.clubJerseyId());
         Team team = Team.create(request.matchId(), request.clubJerseyId());
         Team saved = teamRepository.save(team);
         return toResponse(saved);
@@ -69,20 +79,27 @@ public class TeamService {
     public TeamResponseDTO getById(Long id) {
         Team team = teamRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "team not found"));
+        Match match = requireMatch(team.getMatchId());
+        clubAuthorizationService.requireMember(match.getClubId());
         return toResponse(team);
     }
 
     @Transactional(readOnly = true)
-    public List<TeamResponseDTO> list(UUID matchId) {
-        List<Team> teams = matchId == null
-                ? teamRepository.findAll()
-                : teamRepository.findByMatchId(matchId);
-        return teams.stream().map(TeamService::toResponse).toList();
+    public Page<TeamResponseDTO> list(UUID matchId, Pageable pageable) {
+        if (matchId == null) {
+            throw new ResponseStatusException(BAD_REQUEST, "matchId is required");
+        }
+        Match match = requireMatch(matchId);
+        clubAuthorizationService.requireMember(match.getClubId());
+        return teamRepository.findByMatchId(matchId, pageable).map(TeamService::toResponse);
     }
 
     public TeamResponseDTO updateJersey(Long id, UpdateTeamJerseyRequestDTO request) {
         Team team = teamRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "team not found"));
+        Match match = requireMatch(team.getMatchId());
+        clubAuthorizationService.requireDirector(match.getClubId());
+        validateJersey(match.getClubId(), request.clubJerseyId());
         team.changeJersey(request.clubJerseyId());
         return toResponse(team);
     }
@@ -120,7 +137,7 @@ public class TeamService {
             throw new ResponseStatusException(BAD_REQUEST, "a member cannot be both LINE and GOAL for the same match");
         }
 
-        Map<Long, ClubMember> membersById = loadMembersById(union(normalizedLineIds, normalizedGoalkeeperIds));
+        Map<Long, ClubMember> membersById = loadMembersById(match.getClubId(), union(normalizedLineIds, normalizedGoalkeeperIds));
         List<ClubMember> lineMembers = normalizedLineIds.stream().map(membersById::get).toList();
         List<ClubMember> goalkeeperMembers = normalizedGoalkeeperIds.stream().map(membersById::get).toList();
 
@@ -236,10 +253,11 @@ public class TeamService {
     }
 
     public void delete(Long id) {
-        if (!teamRepository.existsById(id)) {
-            throw new ResponseStatusException(NOT_FOUND, "team not found");
-        }
-        teamRepository.deleteById(id);
+        Team team = teamRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "team not found"));
+        Match match = requireMatch(team.getMatchId());
+        clubAuthorizationService.requireDirector(match.getClubId());
+        teamRepository.delete(team);
     }
 
     private static TeamResponseDTO toResponse(Team team) {
@@ -261,11 +279,11 @@ public class TeamService {
         return normalized;
     }
 
-    private Map<Long, ClubMember> loadMembersById(List<Long> ids) {
+    private Map<Long, ClubMember> loadMembersById(UUID clubId, List<Long> ids) {
         if (ids.isEmpty()) {
             return Map.of();
         }
-        List<ClubMember> found = clubMemberRepository.findAllById(ids);
+        List<ClubMember> found = clubMemberRepository.findByClubIdAndIdIn(clubId, ids);
         Map<Long, ClubMember> byId = new HashMap<>();
         for (ClubMember m : found) {
             byId.put(m.getId(), m);
@@ -276,6 +294,22 @@ public class TeamService {
             throw new ResponseStatusException(BAD_REQUEST, "club members not found: " + missing);
         }
         return byId;
+    }
+
+    private Match requireMatch(UUID matchId) {
+        return matchRepository.findById(matchId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "match not found"));
+    }
+
+    private void validateJersey(UUID clubId, Long jerseyId) {
+        if (jerseyId == null) {
+            return;
+        }
+        ClubJersey jersey = clubJerseyRepository.findById(jerseyId)
+                .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "jersey not found"));
+        if (!clubId.equals(jersey.getClubId())) {
+            throw new ResponseStatusException(BAD_REQUEST, "jersey not in club");
+        }
     }
 
     private static List<Long> union(List<Long> a, List<Long> b) {

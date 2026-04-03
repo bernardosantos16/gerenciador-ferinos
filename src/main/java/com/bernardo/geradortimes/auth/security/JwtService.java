@@ -45,6 +45,7 @@ public class JwtService {
                 .withExpiresAt(Date.from(expiresAt))
                 .withClaim("login", user.getLogin().getValue())
                 .withClaim("nickname", user.getNickname().getValue())
+                .withClaim("role", user.getRole().name())
                 .sign(algorithm);
     }
 
@@ -52,4 +53,3 @@ public class JwtService {
         return verifier.verify(token);
     }
 }
-

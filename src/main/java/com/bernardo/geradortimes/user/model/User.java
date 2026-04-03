@@ -1,6 +1,7 @@
 package com.bernardo.geradortimes.user.model;
 
 import com.bernardo.geradortimes.shared.enums.ActivityStatus;
+import com.bernardo.geradortimes.shared.enums.UserRole;
 import com.bernardo.geradortimes.shared.value_object.Email;
 import com.bernardo.geradortimes.shared.value_object.Nickname;
 import com.bernardo.geradortimes.shared.value_object.PasswordHash;
@@ -37,16 +38,20 @@ public class User {
     @Enumerated(EnumType.STRING)
     private ActivityStatus status;
 
+    @Enumerated(EnumType.STRING)
+    private UserRole role;
+
     protected User() {
     }
 
-    private User(String name, Nickname nickname, Email email, PasswordHash password, Instant createdAt, ActivityStatus activityStatus) {
+    private User(String name, Nickname nickname, Email email, PasswordHash password, Instant createdAt, ActivityStatus activityStatus, UserRole role) {
         this.name = name;
         this.nickname = nickname;
         this.login = email;
         this.password = password;
         this.createdAt = createdAt;
         this.status = activityStatus;
+        this.role = role;
     }
 
     public static User create(String name, Nickname nickname, Email email, PasswordHash password) {
@@ -56,7 +61,8 @@ public class User {
                 email,
                 password,
                 Instant.now(),
-                ActivityStatus.PENDING
+                ActivityStatus.PENDING,
+                UserRole.USER
         );
     }
 
@@ -69,4 +75,3 @@ public class User {
     }
 
 }
-

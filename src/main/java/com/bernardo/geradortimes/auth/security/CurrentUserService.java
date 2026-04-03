@@ -1,5 +1,6 @@
 package com.bernardo.geradortimes.auth.security;
 
+import com.bernardo.geradortimes.shared.enums.UserRole;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -28,5 +29,16 @@ public class CurrentUserService {
         log.error("Não autorizado, autenticação não aponta usuário");
         throw new ResponseStatusException(UNAUTHORIZED, "unauthorized");
     }
-}
 
+    public boolean isAdmin() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return false;
+        }
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof UserPrincipal userPrincipal) {
+            return userPrincipal.role() == UserRole.ADMIN;
+        }
+        return false;
+    }
+}

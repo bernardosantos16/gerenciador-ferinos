@@ -13,6 +13,10 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
@@ -26,7 +30,6 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -83,8 +86,9 @@ public class UserController {
                     content = @Content(array = @ArraySchema(schema = @Schema(implementation = UserResponseDTO.class)))),
             @ApiResponse(responseCode = "401", description = "Nao autenticado.")
     })
-    public List<UserResponseDTO> list() {
-        return userService.list();
+    @PreAuthorize("hasRole('ADMIN')")
+    public Page<UserResponseDTO> list(@PageableDefault(size = 50) Pageable pageable) {
+        return userService.list(pageable);
     }
 
     @DeleteMapping("/{id}")
@@ -96,6 +100,7 @@ public class UserController {
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasRole('ADMIN')")
     public void delete(
             @Parameter(description = "ID do usuario.", required = true, example = "3fa85f64-5717-4562-b3fc-2c963f66afa6")
             @PathVariable UUID id
