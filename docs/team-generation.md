@@ -31,22 +31,14 @@ Contexto: implementado em `src/main/java/com/bernardo/geradortimes/team/service/
 ## Distribuição dos jogadores de linha
 - Ordena `ScoredMember` de linha em ordem decrescente de score (tie-break pelo ID).
 - Cria um bucket por time (`TeamBucket`), cada um sabe seu tamanho alvo.
-- Para cada jogador (do mais forte para o mais fraco):
-  - Escolhe o bucket “mais fraco” que ainda não está cheio:
-    - menor `totalScore`
-    - depois menor `size`
-    - depois menor `teamId`
-  - Adiciona o jogador e atualiza o `totalScore`.
-- Efeito: os jogadores mais fortes caem nos times atualmente mais fracos, buscando equilíbrio de score e de quantidade.
+- Usa **snake draft**: em rodadas pares os buckets recebem na ordem reversa (último → primeiro), em rodadas ímpares na ordem direta (primeiro → último).
+- Se o bucket natural da rodada estiver cheio, escolhe o mais fraco disponível.
+- Efeito: o time que pegou o melhor jogador da rodada recebe o pior da rodada seguinte, promovendo equilíbrio mais justo que o greedy puro.
 
 ## Tratamento de goleiros
-- Se `goalkeeperMemberIds.size == teamCount`:
-  - Calcula score também para goleiros.
-  - Ordena do mais forte ao mais fraco.
-  - Atribui cada goleiro ao bucket atualmente mais fraco (mesma heurística), um por time.
-- Caso contrário:
-  - Nenhum goleiro é forçado a um time.
-  - Todos entram em `unassignedGoalkeeperMemberIds` e são persistidos com `teamId = null`.
+- Calcula score para todos os goleiros, ordena do mais forte ao mais fraco.
+- Atribui cada goleiro ao bucket mais fraco que ainda não tem goleiro (1 por time).
+- Quando todos os times já têm goleiro, os excedentes vão para `unassignedGoalkeeperMemberIds` e são persistidos com `teamId = null`.
 
 ## Persistência
 - Antes de gerar, limpa dados anteriores da partida (`matchParticipantRepository.deleteByMatchId`, `teamRepository.deleteByMatchId`).

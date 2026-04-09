@@ -164,39 +164,27 @@ public class TeamService {
             buckets.add(new TeamBucket(savedTeams.get(i).getId(), teamSizes.get(i)));
         }
 
-        for (ScoredMember m : scoredLineMembers) {
-            TeamBucket bucket = pickBucketForNextPlayer(buckets);
-            bucket.addLine(m);
-        }
+        distributeLinePlayers(scoredLineMembers, buckets);
 
         List<Long> unassignedGoalkeepers = new ArrayList<>();
 
-        if (goalkeeperMembers.size() == teamCount) {
-            List<ScoredMember> scoredKeepers = scoreMembers(goalkeeperMembers);
-            scoredKeepers.sort(Comparator
-                    .comparingDouble(ScoredMember::score).reversed()
-                    .thenComparingLong(ScoredMember::memberId));
+        List<ScoredMember> scoredKeepers = scoreMembers(goalkeeperMembers);
+        scoredKeepers.sort(Comparator
+                .comparingDouble(ScoredMember::score).reversed()
+                .thenComparingLong(ScoredMember::memberId));
 
-            // Assign strongest keepers to currently weakest teams.
-            Set<Long> availableTeamIds = new HashSet<>();
-            for (TeamBucket b : buckets) {
-                availableTeamIds.add(b.teamId);
-            }
-            for (ScoredMember keeper : scoredKeepers) {
-                TeamBucket weakest = buckets.stream()
-                        .filter(b -> availableTeamIds.contains(b.teamId))
-                        .min(Comparator.comparingDouble(
-                                TeamBucket::totalScore)
-                                .thenComparingLong(b -> b.teamId)
-                        )
-                        .orElseThrow();
+        // Assign strongest keepers to weakest teams without a goalkeeper (1 per team).
+        for (ScoredMember keeper : scoredKeepers) {
+            TeamBucket weakest = buckets.stream()
+                    .filter(b -> b.goalkeeperMemberId == null)
+                    .min(Comparator.comparingDouble(TeamBucket::totalScore)
+                            .thenComparingLong(b -> b.teamId))
+                    .orElse(null);
+
+            if (weakest != null) {
                 weakest.assignGoalkeeper(keeper);
-                availableTeamIds.remove(weakest.teamId);
-            }
-
-        } else {
-            for (ClubMember gk : goalkeeperMembers) {
-                unassignedGoalkeepers.add(gk.getId());
+            } else {
+                unassignedGoalkeepers.add(keeper.memberId());
             }
         }
 
@@ -395,6 +383,26 @@ public class TeamService {
                         .thenComparingLong(b -> b.teamId)
                 )
                 .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "not enough buckets to place members"));
+    }
+
+    private static void distributeLinePlayers(List<ScoredMember> scoredLineMembers, List<TeamBucket> buckets) {
+        int n = buckets.size();
+        for (int i = 0; i < scoredLineMembers.size(); i++) {
+            int round = i / n;
+            int slotInRound = i % n;
+            // Even rounds: weakest-to-strongest (bucket n-1 -> 0).
+            // Odd rounds: strongest-to-weakest (bucket 0 -> n-1).
+            int bucketIndex = (round % 2 == 0)
+                    ? n - 1 - slotInRound
+                    : slotInRound;
+
+            TeamBucket bucket = buckets.get(Math.min(bucketIndex, n - 1));
+            // If the natural slot is full, pick the weakest available bucket.
+            if (bucket.isFull()) {
+                bucket = pickBucketForNextPlayer(buckets);
+            }
+            bucket.addLine(scoredLineMembers.get(i));
+        }
     }
 
     private record ScoredMember(long memberId, double score) {
