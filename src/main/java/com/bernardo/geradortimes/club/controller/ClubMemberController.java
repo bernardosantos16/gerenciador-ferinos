@@ -2,6 +2,7 @@ package com.bernardo.geradortimes.club.controller;
 
 
 import com.bernardo.geradortimes.club.dto.request.AddClubMemberRequestDTO;
+import com.bernardo.geradortimes.club.dto.response.ClubMemberResponseDTO;
 import com.bernardo.geradortimes.club.service.ClubMemberService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -12,6 +13,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -50,5 +53,23 @@ public class ClubMemberController {
         return ResponseEntity
                 .created(URI.create("/api/clubs/" + clubId + "/members"))
                 .build();
+    }
+
+    @GetMapping
+    @Operation(summary = "Listar membros do clube")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Membros listados.",
+                    content = @Content(schema = @Schema(implementation = ClubMemberResponseDTO.class))),
+            @ApiResponse(responseCode = "401", description = "Nao autenticado."),
+            @ApiResponse(responseCode = "403", description = "Usuario nao possui permissao (membro do clube requerido).",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    public ResponseEntity<Page<ClubMemberResponseDTO>> list(
+            @Parameter(description = "ID do clube.", required = true, example = "c0a8012e-6f1f-4b4b-9f5e-7a8b9c0d1e2f")
+            @PathVariable UUID clubId,
+            Pageable pageable
+    ) {
+        Page<ClubMemberResponseDTO> members = clubMemberService.listMembers(clubId, pageable);
+        return ResponseEntity.ok(members);
     }
 }
