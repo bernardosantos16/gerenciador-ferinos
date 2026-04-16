@@ -1,6 +1,7 @@
 package com.bernardo.geradortimes.club.model;
 
 import com.bernardo.geradortimes.shared.enums.ActivityStatus;
+import com.bernardo.geradortimes.shared.value_object.HexColor;
 import com.bernardo.geradortimes.shared.value_object.Nickname;
 import jakarta.persistence.*;
 import lombok.Getter;

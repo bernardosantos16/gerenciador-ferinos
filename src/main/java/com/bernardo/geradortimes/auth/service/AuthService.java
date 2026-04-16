@@ -9,6 +9,7 @@ import com.bernardo.geradortimes.shared.enums.ActivityStatus;
 import com.bernardo.geradortimes.shared.security.PasswordService;
 import com.bernardo.geradortimes.user.model.User;
 import com.bernardo.geradortimes.user.repository.UserRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -17,6 +18,7 @@ import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 
 @Service
 @Transactional
+@Slf4j
 public class AuthService {
 
     private final UserRepository userRepository;
@@ -44,11 +46,13 @@ public class AuthService {
                 .orElseThrow(() -> new ResponseStatusException(UNAUTHORIZED, "invalid credentials"));
 
         if (user.getStatus() == ActivityStatus.INACTIVE) {
+            log.error("Usuario inativo tentou autenticar - userId: {}", user.getId());
             throw new ResponseStatusException(UNAUTHORIZED, "invalid credentials");
         }
 
         boolean ok = passwordService.matches(request.password(), user.getPassword().getValue());
         if (!ok) {
+            log.error("Senha incorreta para usuario - userId: {}", user.getId());
             throw new ResponseStatusException(UNAUTHORIZED, "invalid credentials");
         }
 

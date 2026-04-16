@@ -2,9 +2,11 @@ package com.bernardo.geradortimes.shared.security;
 
 import de.mkammerer.argon2.Argon2;
 import de.mkammerer.argon2.Argon2Factory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 public class Argon2PasswordService implements PasswordService {
 
@@ -37,7 +39,7 @@ public class Argon2PasswordService implements PasswordService {
             return false;
         }
 
-        Argon2 argon2 = Argon2Factory.create();
+        Argon2 argon2 = Argon2Factory.create(Argon2Factory.Argon2Types.ARGON2id, 46, 46);
         String pepperPassword = rawPassword.concat(argonPepper);
         char[] passwordChars = pepperPassword.toCharArray();
         try {
@@ -47,4 +49,3 @@ public class Argon2PasswordService implements PasswordService {
         }
     }
 }
-

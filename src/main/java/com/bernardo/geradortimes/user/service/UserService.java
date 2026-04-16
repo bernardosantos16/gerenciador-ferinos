@@ -9,6 +9,8 @@ import com.bernardo.geradortimes.auth.security.CurrentUserService;
 import com.bernardo.geradortimes.user.dto.request.CreateUserRequestDTO;
 import com.bernardo.geradortimes.user.dto.response.UserResponseDTO;
 import com.bernardo.geradortimes.user.model.User;
+import com.bernardo.geradortimes.user.rabbitmq.UserRegisteredEvent;
+import com.bernardo.geradortimes.user.rabbitmq.UserRegisteredProducer;
 import com.bernardo.geradortimes.user.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -24,6 +26,7 @@ import java.util.UUID;
 import static org.springframework.http.HttpStatus.CONFLICT;
 import static org.springframework.http.HttpStatus.FORBIDDEN;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
+import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 
 @Slf4j
 @Service
@@ -33,11 +36,13 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordService passwordService;
     private final CurrentUserService currentUserService;
+    private final UserRegisteredProducer userRegisteredProducer;
 
-    public UserService(UserRepository userRepository, PasswordService passwordService, CurrentUserService currentUserService) {
+    public UserService(UserRepository userRepository, PasswordService passwordService, CurrentUserService currentUserService, UserRegisteredProducer userRegisteredProducer) {
         this.userRepository = userRepository;
         this.passwordService = passwordService;
         this.currentUserService = currentUserService;
+        this.userRegisteredProducer = userRegisteredProducer;
     }
 
     public UserResponseDTO create(CreateUserRequestDTO request) {
@@ -58,7 +63,10 @@ public class UserService {
         PasswordHash passwordHash = PasswordHash.fromEncoded(passwordService.hash(request.password()));
 
         User user = User.create(request.name(), nickname, email, passwordHash);
+        String verificationToken = user.generateEmailVerificationToken();
         User saved = userRepository.save(user);
+
+        userRegisteredProducer.publish(new UserRegisteredEvent(saved.getId(), email.getValue(), verificationToken));
 
         return toResponse(saved);
     }
@@ -99,6 +107,19 @@ public class UserService {
             throw new ResponseStatusException(NOT_FOUND, "user not found");
         }
         userRepository.deleteById(id);
+    }
+
+    @Transactional
+    public void verifyEmailToken(String token) {
+        User user = userRepository.findByEmailVerificationToken(token)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "invalid or expired verification token"));
+
+        boolean verified = user.verifyEmail(token);
+        if (!verified) {
+            throw new ResponseStatusException(UNAUTHORIZED, "invalid verification token");
+        }
+        userRepository.save(user);
+        log.info("Email verificado com sucesso - userId: {}", user.getId());
     }
 
     private static UserResponseDTO toResponse(User user) {

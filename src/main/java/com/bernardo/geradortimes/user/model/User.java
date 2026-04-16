@@ -41,6 +41,9 @@ public class User {
     @Enumerated(EnumType.STRING)
     private UserRole role;
 
+    @Column(name = "email_verification_token", unique = true)
+    private String emailVerificationToken;
+
     protected User() {
     }
 
@@ -72,6 +75,20 @@ public class User {
 
     public void inactivateUser() {
         this.status = ActivityStatus.INACTIVE;
+    }
+
+    public String generateEmailVerificationToken() {
+        this.emailVerificationToken = UUID.randomUUID().toString();
+        return this.emailVerificationToken;
+    }
+
+    public boolean verifyEmail(String token) {
+        if (this.emailVerificationToken != null && this.emailVerificationToken.equals(token)) {
+            this.emailVerificationToken = null;
+            this.status = ActivityStatus.ACTIVE;
+            return true;
+        }
+        return false;
     }
 
 }

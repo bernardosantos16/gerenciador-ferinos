@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -106,5 +107,26 @@ public class UserController {
             @PathVariable UUID id
     ) {
         userService.delete(id);
+    }
+
+    @GetMapping("/verify-email")
+    @Operation(
+            summary = "Verificar email",
+            description = "Verifica o email do usuario usando o token de verificacao enviado por email. Endpoint publico.",
+            security = {}
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Email verificado com sucesso."),
+            @ApiResponse(responseCode = "404", description = "Token de verificacao invalido ou expirado.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "401", description = "Token de verificacao invalido.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void verifyEmail(
+            @Parameter(description = "Token de verificacao de email.", required = true)
+            @RequestParam String token
+    ) {
+        userService.verifyEmailToken(token);
     }
 }
