@@ -2,6 +2,7 @@ package com.bernardo.geradortimes.match.service;
 
 import com.bernardo.geradortimes.club.service.ClubAuthorizationService;
 import com.bernardo.geradortimes.match.dto.request.CreateMatchRequestDTO;
+import com.bernardo.geradortimes.match.dto.request.UpdateMatchRequestDTO;
 import com.bernardo.geradortimes.match.dto.response.MatchParticipantResponseDTO;
 import com.bernardo.geradortimes.match.dto.response.MatchResponseDTO;
 import com.bernardo.geradortimes.match.model.Match;
@@ -72,6 +73,16 @@ public class MatchService {
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "match not found"));
         clubAuthorizationService.requireMember(match.getClubId());
         return matchParticipantRepository.findByMatchId(matchId).stream().map(MatchService::toResponse).toList();
+    }
+
+    public MatchResponseDTO update(UUID id, UpdateMatchRequestDTO request) {
+        Match match = matchRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "match not found"));
+        clubAuthorizationService.requireDirector(match.getClubId());
+
+        match.updateDateTime(request.dateTime());
+        Match saved = matchRepository.save(match);
+        return toResponse(saved);
     }
 
     public void delete(UUID id) {

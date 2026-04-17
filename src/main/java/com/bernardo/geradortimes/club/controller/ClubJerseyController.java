@@ -1,6 +1,7 @@
 package com.bernardo.geradortimes.club.controller;
 
 import com.bernardo.geradortimes.club.dto.request.AddJerseyRequestDTO;
+import com.bernardo.geradortimes.club.dto.request.UpdateJerseyRequestDTO;
 import com.bernardo.geradortimes.club.dto.response.ClubJerseyResponseDTO;
 import com.bernardo.geradortimes.club.service.ClubJerseyService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -19,14 +20,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.util.UUID;
@@ -80,6 +74,29 @@ public class ClubJerseyController {
             @PageableDefault(size = 50) Pageable pageable
     ) {
         return clubJerseyService.listByClub(clubId, pageable);
+    }
+
+    @PatchMapping("/{jerseyId}")
+    @Operation(summary = "Atualizar camisa do clube")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Camisa atualizada.",
+                    content = @Content(schema = @Schema(implementation = ClubJerseyResponseDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Requisicao invalida (validacao).",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "401", description = "Nao autenticado."),
+            @ApiResponse(responseCode = "403", description = "Usuario nao possui permissao (DIRECTOR requerido).",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "404", description = "Camisa nao encontrada.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    public ResponseEntity<ClubJerseyResponseDTO> update(
+            @Parameter(description = "ID do clube.", required = true, example = "c0a8012e-6f1f-4b4b-9f5e-7a8b9c0d1e2f")
+            @PathVariable UUID clubId,
+            @Parameter(description = "ID da camisa.", required = true, example = "10")
+            @PathVariable Long jerseyId,
+            @Valid @RequestBody UpdateJerseyRequestDTO request
+    ) {
+        return ResponseEntity.ok(clubJerseyService.updateJersey(clubId, jerseyId, request));
     }
 
     @DeleteMapping("/{jerseyId}")

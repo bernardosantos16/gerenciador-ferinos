@@ -48,4 +48,16 @@ public class ClubJersey {
                 clubId
          );
     }
+
+    public void changeName(String name) {
+        this.name = name;
+    }
+
+    public void changeColor(HexColor hexColor) {
+        this.hexColor = hexColor;
+    }
+
+    public void changeIsGoalkeeper(Boolean isGoalkeeperJersey) {
+        this.isGoalkeeperJersey = isGoalkeeperJersey;
+    }
 }

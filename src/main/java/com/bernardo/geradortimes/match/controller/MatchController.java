@@ -1,6 +1,7 @@
 package com.bernardo.geradortimes.match.controller;
 
 import com.bernardo.geradortimes.match.dto.request.CreateMatchRequestDTO;
+import com.bernardo.geradortimes.match.dto.request.UpdateMatchRequestDTO;
 import com.bernardo.geradortimes.match.dto.response.MatchParticipantResponseDTO;
 import com.bernardo.geradortimes.match.dto.response.MatchResponseDTO;
 import com.bernardo.geradortimes.match.service.MatchService;
@@ -20,15 +21,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.util.List;
@@ -84,6 +77,27 @@ public class MatchController {
     ) {
         return matchService.getById(id);
     }
+
+//    @PatchMapping("/{id}")
+//    @Operation(summary = "Atualizar partida")
+//    @ApiResponses({
+//            @ApiResponse(responseCode = "200", description = "Partida atualizada.",
+//                    content = @Content(schema = @Schema(implementation = MatchResponseDTO.class))),
+//            @ApiResponse(responseCode = "400", description = "Requisicao invalida (validacao).",
+//                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+//            @ApiResponse(responseCode = "401", description = "Nao autenticado."),
+//            @ApiResponse(responseCode = "403", description = "Usuario nao possui permissao (DIRECTOR requerido).",
+//                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+//            @ApiResponse(responseCode = "404", description = "Partida nao encontrada.",
+//                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+//    })
+//    public MatchResponseDTO update(
+//            @Parameter(description = "ID da partida.", required = true, example = "f47ac10b-58cc-4372-a567-0e02b2c3d479")
+//            @PathVariable UUID id,
+//            @Valid @RequestBody UpdateMatchRequestDTO request
+//    ) {
+//        return matchService.update(id, request);
+//    }
 
     @GetMapping
     @Operation(

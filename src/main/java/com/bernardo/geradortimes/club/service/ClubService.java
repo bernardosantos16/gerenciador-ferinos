@@ -2,6 +2,7 @@ package com.bernardo.geradortimes.club.service;
 
 import com.bernardo.geradortimes.auth.security.CurrentUserService;
 import com.bernardo.geradortimes.club.dto.request.CreateClubRequestDTO;
+import com.bernardo.geradortimes.club.dto.request.UpdateClubRequestDTO;
 import com.bernardo.geradortimes.club.dto.response.ClubResponseDTO;
 import com.bernardo.geradortimes.club.model.Club;
 import com.bernardo.geradortimes.club.repository.ClubRepository;
@@ -25,18 +26,21 @@ public class ClubService {
     private final ClubMemberService clubMemberService;
     private final UserRepository userRepository;
     private final CurrentUserService currentUserService;
+    private final ClubAuthorizationService clubAuthorizationService;
 
 
     public ClubService(
             ClubRepository clubRepository,
             ClubMemberService clubMemberService,
             UserRepository userRepository,
-            CurrentUserService currentUserService
+            CurrentUserService currentUserService,
+            ClubAuthorizationService clubAuthorizationService
     ) {
         this.clubRepository = clubRepository;
         this.clubMemberService = clubMemberService;
         this.userRepository = userRepository;
         this.currentUserService = currentUserService;
+        this.clubAuthorizationService = clubAuthorizationService;
     }
 
     public ClubResponseDTO createClub(CreateClubRequestDTO requestDTO) {
@@ -65,6 +69,34 @@ public class ClubService {
         Club club = clubRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "club not found"));
 
+        return new ClubResponseDTO(club.getId(), club.getName(), club.getNickname().getValue());
+    }
+
+    @Transactional
+    public ClubResponseDTO update(UUID clubId, UpdateClubRequestDTO request) {
+        clubAuthorizationService.requireDirector(clubId);
+        Club club = clubRepository.findById(clubId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "club not found"));
+
+        if (request.name() != null && !request.name().isBlank()) {
+            club.changeName(request.name());
+        }
+        if (request.nickname() != null && !request.nickname().isBlank()) {
+            club.changeNickname(Nickname.of(request.nickname()));
+        }
+
+        Club saved = clubRepository.save(club);
+        return new ClubResponseDTO(saved.getId(), saved.getName(), saved.getNickname().getValue());
+    }
+
+    @Transactional
+    public ClubResponseDTO softDelete(UUID clubId) {
+        clubAuthorizationService.requireDirector(clubId);
+        Club club = clubRepository.findById(clubId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "club not found"));
+
+        club.deactivate();
+        clubRepository.save(club);
         return new ClubResponseDTO(club.getId(), club.getName(), club.getNickname().getValue());
     }
 }

@@ -49,4 +49,16 @@ public class Club {
         );
     }
 
+    public void deactivate() {
+        this.status = ActivityStatus.INACTIVE;
+    }
+
+    public void changeName(String name) {
+        this.name = name;
+    }
+
+    public void changeNickname(Nickname nickname) {
+        this.nickname = nickname;
+    }
+
 }

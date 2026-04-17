@@ -1,6 +1,7 @@
 package com.bernardo.geradortimes.club.service;
 
 import com.bernardo.geradortimes.club.dto.request.AddJerseyRequestDTO;
+import com.bernardo.geradortimes.club.dto.request.UpdateJerseyRequestDTO;
 import com.bernardo.geradortimes.club.dto.response.ClubJerseyResponseDTO;
 import com.bernardo.geradortimes.club.model.ClubJersey;
 import com.bernardo.geradortimes.club.repository.ClubJerseyRepository;
@@ -53,6 +54,28 @@ public class ClubJerseyService {
             throw new ResponseStatusException(NOT_FOUND, "jersey not found");
         }
         clubJerseyRepository.delete(jersey);
+    }
+
+    public ClubJerseyResponseDTO updateJersey(UUID clubId, Long jerseyId, UpdateJerseyRequestDTO request) {
+        clubAuthorizationService.requireDirector(clubId);
+        ClubJersey jersey = clubJerseyRepository.findById(jerseyId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "jersey not found"));
+        if (!clubId.equals(jersey.getClubId())) {
+            throw new ResponseStatusException(NOT_FOUND, "jersey not found");
+        }
+
+        if (request.name() != null && !request.name().isBlank()) {
+            jersey.changeName(request.name());
+        }
+        if (request.hexColor() != null && !request.hexColor().isBlank()) {
+            jersey.changeColor(HexColor.of(request.hexColor()));
+        }
+        if (request.isGoalkeeperJersey() != null) {
+            jersey.changeIsGoalkeeper(request.isGoalkeeperJersey());
+        }
+
+        ClubJersey saved = clubJerseyRepository.save(jersey);
+        return toResponse(saved);
     }
 
     private static ClubJerseyResponseDTO toResponse(ClubJersey jersey) {

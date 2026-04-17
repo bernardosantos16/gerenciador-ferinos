@@ -12,6 +12,8 @@ public interface MatchParticipantRepository extends JpaRepository<MatchParticipa
 
     List<MatchParticipant> findByMatchId(UUID matchId);
 
+    List<MatchParticipant> findByClubMemberIdIn(List<Long> clubMemberIds);
+
     void deleteByMatchId(UUID matchId);
 }
 

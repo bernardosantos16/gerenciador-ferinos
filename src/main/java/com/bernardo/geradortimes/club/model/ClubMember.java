@@ -82,4 +82,16 @@ public class ClubMember {
                 clubRole
         );
     }
+
+    public void changeName(String name) {
+        this.name = name;
+    }
+
+    public void changeRating(Integer rating) {
+        this.rating = rating;
+    }
+
+    public void changeRole(ClubRole role) {
+        this.clubRole = role;
+    }
 }

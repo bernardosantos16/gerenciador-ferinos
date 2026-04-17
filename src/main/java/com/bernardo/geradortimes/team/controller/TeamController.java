@@ -3,6 +3,8 @@ package com.bernardo.geradortimes.team.controller;
 import com.bernardo.geradortimes.team.dto.request.CreateTeamRequestDTO;
 import com.bernardo.geradortimes.team.dto.request.GenerateTeamsRequestDTO;
 import com.bernardo.geradortimes.team.dto.request.UpdateTeamJerseyRequestDTO;
+import com.bernardo.geradortimes.team.dto.request.UpdateTeamRequestDTO;
+import com.bernardo.geradortimes.team.dto.request.SwapPlayersRequestDTO;
 import com.bernardo.geradortimes.team.dto.response.GenerateTeamsResponseDTO;
 import com.bernardo.geradortimes.team.dto.response.TeamResponseDTO;
 import com.bernardo.geradortimes.team.service.TeamService;
@@ -22,16 +24,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.util.UUID;
@@ -129,7 +122,7 @@ public class TeamController {
                     - Distribui jogadores de linha por score (rating + historico) tentando equilibrar os times.
                     - Se a quantidade de goleiros for igual ao numero de times, atribui um goleiro por time.
                     - Caso contrario, todos os goleiros ficam como nao-atribuidos.
-
+                    
                     Requer que o usuario autenticado seja DIRECTOR do clube da partida.
                     """
     )
@@ -146,6 +139,27 @@ public class TeamController {
         return teamService.generate(request);
     }
 
+    @PutMapping("/{id}")
+    @Operation(summary = "Atualizar time")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Time atualizado.",
+                    content = @Content(schema = @Schema(implementation = TeamResponseDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Requisicao invalida (validacao).",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "401", description = "Nao autenticado."),
+            @ApiResponse(responseCode = "403", description = "Usuario nao possui permissao (DIRECTOR requerido).",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "404", description = "Time ou partida nao encontrados.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    public TeamResponseDTO update(
+            @Parameter(description = "ID do time.", required = true, example = "200")
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateTeamRequestDTO request
+    ) {
+        return teamService.update(id, request);
+    }
+
     @DeleteMapping("/{id}")
     @Operation(summary = "Excluir time")
     @ApiResponses({
@@ -160,5 +174,36 @@ public class TeamController {
             @PathVariable Long id
     ) {
         teamService.delete(id);
+    }
+
+    @PostMapping("/swap")
+    @Operation(
+            summary = "Trocar jogadores entre times",
+            description = """
+                    Permite trocar jogadores entre times de uma partida.
+                    
+                    Validações:
+                    - Requer que o usuario autenticado seja DIRECTOR do clube da partida.
+                    - Os times já devem ter sido gerados para a partida.
+                    - Apenas jogadores da mesma posição podem ser trocados (LINE com LINE, GOAL com GOAL).
+                    - Jogadores devem estar atribuidos a diferentes times.
+                    - Ambos os jogadores devem estar atribuidos (nao podem ter teamId nulo).
+                    """
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Jogadores trocados com sucesso."),
+            @ApiResponse(responseCode = "400", description = "Regra de negocio/validacao (ex.: times nao gerados, posicoes diferentes, etc.).",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "401", description = "Nao autenticado."),
+            @ApiResponse(responseCode = "403", description = "Usuario nao possui permissao (DIRECTOR requerido).",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "404", description = "Partida nao encontrada.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void swapPlayers(
+            @Valid @RequestBody SwapPlayersRequestDTO request
+    ) {
+        teamService.swapPlayers(request);
     }
 }

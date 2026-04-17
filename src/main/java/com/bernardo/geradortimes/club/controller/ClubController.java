@@ -1,6 +1,7 @@
 package com.bernardo.geradortimes.club.controller;
 
 import com.bernardo.geradortimes.club.dto.request.CreateClubRequestDTO;
+import com.bernardo.geradortimes.club.dto.request.UpdateClubRequestDTO;
 import com.bernardo.geradortimes.club.dto.response.ClubResponseDTO;
 import com.bernardo.geradortimes.club.service.ClubService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -65,5 +66,47 @@ public class ClubController {
     ){
         var response = clubService.getClub(id);
         return ResponseEntity.ok(response);
+    }
+
+    @PatchMapping("/{id}")
+    @Operation(summary = "Atualizar clube")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Clube atualizado.",
+                    content = @Content(schema = @Schema(implementation = ClubResponseDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Requisicao invalida (validacao).",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "401", description = "Nao autenticado."),
+            @ApiResponse(responseCode = "403", description = "Usuario nao possui permissao (DIRECTOR requerido).",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "404", description = "Clube nao encontrado.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    public ResponseEntity<ClubResponseDTO> update(
+            @Parameter(description = "ID do clube.", required = true, example = "c0a8012e-6f1f-4b4b-9f5e-7a8b9c0d1e2f")
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateClubRequestDTO request
+    ) {
+        return ResponseEntity.ok(clubService.update(id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    @Operation(
+            summary = "Desativar clube (soft delete)",
+            description = "Altera o status do clube para INACTIVE. Requer DIRECTOR do clube."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Clube desativado.",
+                    content = @Content(schema = @Schema(implementation = ClubResponseDTO.class))),
+            @ApiResponse(responseCode = "401", description = "Nao autenticado."),
+            @ApiResponse(responseCode = "403", description = "Usuario nao possui permissao (DIRECTOR requerido).",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "404", description = "Clube nao encontrado.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    public ResponseEntity<ClubResponseDTO> delete(
+            @Parameter(description = "ID do clube.", required = true, example = "c0a8012e-6f1f-4b4b-9f5e-7a8b9c0d1e2f")
+            @PathVariable UUID id
+    ) {
+        return ResponseEntity.ok(clubService.softDelete(id));
     }
 }

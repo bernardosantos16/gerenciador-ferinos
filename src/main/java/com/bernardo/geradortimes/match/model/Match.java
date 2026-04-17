@@ -36,4 +36,8 @@ public class Match {
     public static Match create(UUID clubId, Instant dateTime) {
         return new Match(clubId, dateTime);
     }
+
+    public void updateDateTime(Instant dateTime) {
+        this.dateTime = dateTime;
+    }
 }

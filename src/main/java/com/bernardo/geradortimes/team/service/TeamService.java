@@ -13,6 +13,9 @@ import com.bernardo.geradortimes.match.repository.MatchRepository;
 import com.bernardo.geradortimes.team.dto.request.CreateTeamRequestDTO;
 import com.bernardo.geradortimes.team.dto.request.GenerateTeamsRequestDTO;
 import com.bernardo.geradortimes.team.dto.request.UpdateTeamJerseyRequestDTO;
+import com.bernardo.geradortimes.team.dto.request.UpdateTeamRequestDTO;
+import com.bernardo.geradortimes.team.dto.request.SwapPlayersRequestDTO;
+import com.bernardo.geradortimes.team.dto.request.PlayerSwapDTO;
 import com.bernardo.geradortimes.team.dto.response.GenerateTeamsResponseDTO;
 import com.bernardo.geradortimes.team.dto.response.GeneratedTeamDTO;
 import com.bernardo.geradortimes.team.dto.response.TeamResponseDTO;
@@ -102,6 +105,19 @@ public class TeamService {
         validateJersey(match.getClubId(), request.clubJerseyId());
         team.changeJersey(request.clubJerseyId());
         return toResponse(team);
+    }
+
+    public TeamResponseDTO update(Long id, UpdateTeamRequestDTO request) {
+        Team team = teamRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "team not found"));
+
+        Match match = requireMatch(team.getMatchId());
+        clubAuthorizationService.requireDirector(match.getClubId());
+        validateJersey(match.getClubId(), request.clubJerseyId());
+        team.changeJersey(request.clubJerseyId());
+
+        Team saved = teamRepository.save(team);
+        return toResponse(saved);
     }
 
     public GenerateTeamsResponseDTO generate(GenerateTeamsRequestDTO request) {
@@ -238,6 +254,88 @@ public class TeamService {
                 unassignedGoalkeepers.size()
         );
         return new GenerateTeamsResponseDTO(matchId, teamCount, generatedTeams, unassignedGoalkeepers);
+    }
+
+    public void swapPlayers(SwapPlayersRequestDTO request) {
+        UUID matchId = request.matchId();
+        List<PlayerSwapDTO> swaps = request.swaps();
+
+        if (swaps == null || swaps.isEmpty()) {
+            throw new ResponseStatusException(BAD_REQUEST, "swaps list cannot be empty");
+        }
+
+        Match match = matchRepository.findById(matchId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "match not found"));
+        clubAuthorizationService.requireDirector(match.getClubId());
+
+        // Validate that teams have been generated for this match
+        List<Team> teams = teamRepository.findByMatchId(matchId);
+        if (teams.isEmpty()) {
+            throw new ResponseStatusException(BAD_REQUEST, "teams must be generated before swapping players");
+        }
+
+        // Get all participants for this match
+        List<MatchParticipant> allParticipants = matchParticipantRepository.findByMatchId(matchId);
+        if (allParticipants.isEmpty()) {
+            throw new ResponseStatusException(BAD_REQUEST, "no participants found for this match");
+        }
+
+        // Create a map of member IDs to their participants
+        Map<Long, MatchParticipant> participantsByMemberId = new HashMap<>();
+        for (MatchParticipant p : allParticipants) {
+            participantsByMemberId.put(p.getClubMemberId(), p);
+        }
+
+        // Collect all member IDs from swaps
+        Set<Long> memberIds = new HashSet<>();
+        for (PlayerSwapDTO swap : swaps) {
+            memberIds.add(swap.memberIdFrom());
+            memberIds.add(swap.memberIdTo());
+        }
+
+        // Validate that all members are participants in this match
+        for (Long memberId : memberIds) {
+            if (!participantsByMemberId.containsKey(memberId)) {
+                throw new ResponseStatusException(BAD_REQUEST, "member " + memberId + " is not a participant in this match");
+            }
+        }
+
+        // Validate and perform swaps
+        for (PlayerSwapDTO swap : swaps) {
+            MatchParticipant p1 = participantsByMemberId.get(swap.memberIdFrom());
+            MatchParticipant p2 = participantsByMemberId.get(swap.memberIdTo());
+
+            // Validate that both players belong to different teams
+            if (p1.getTeamId() == null || p2.getTeamId() == null) {
+                throw new ResponseStatusException(BAD_REQUEST,
+                        "cannot swap unassigned players (members with no team)");
+            }
+
+            if (p1.getTeamId().equals(p2.getTeamId())) {
+                throw new ResponseStatusException(BAD_REQUEST,
+                        "cannot swap players from the same team");
+            }
+
+            // Validate that positions match (goalkeeper can only swap with goalkeeper)
+            if (!p1.getPosition().equals(p2.getPosition())) {
+                throw new ResponseStatusException(BAD_REQUEST,
+                        "can only swap players with the same position (LINE with LINE, GOAL with GOAL)");
+            }
+
+            // Perform the swap
+            Long tempTeamId = p1.getTeamId();
+            p1.assignTeam(p2.getTeamId());
+            p2.assignTeam(tempTeamId);
+        }
+
+        // Save all updated participants
+        matchParticipantRepository.saveAll(allParticipants);
+
+        log.info(
+                "player swaps completed matchId={} swapCount={}",
+                matchId,
+                swaps.size()
+        );
     }
 
     public void delete(Long id) {
