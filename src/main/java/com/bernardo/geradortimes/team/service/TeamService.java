@@ -184,7 +184,7 @@ public class TeamService {
 
         List<Long> unassignedGoalkeepers = new ArrayList<>();
 
-        List<ScoredMember> scoredKeepers = scoreMembers(goalkeeperMembers);
+        List<ScoredMember> scoredKeepers = new ArrayList<>(scoreMembers(goalkeeperMembers));
         scoredKeepers.sort(Comparator
                 .comparingDouble(ScoredMember::score).reversed()
                 .thenComparingLong(ScoredMember::memberId));
