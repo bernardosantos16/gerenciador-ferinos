@@ -7,6 +7,7 @@ import com.bernardo.geradortimes.club.model.ClubMember;
 import com.bernardo.geradortimes.club.repository.ClubMemberRepository;
 import com.bernardo.geradortimes.shared.enums.ClubRole;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -76,6 +77,24 @@ public class ClubMemberService {
                         member.getTeamId(),
                         member.getClubRole()
                 ));
+    }
+
+    public List<ClubMemberResponseDTO> getAllMembers(UUID clubId) {
+        clubAuthorizationService.requireMember(clubId);
+        Page<ClubMember> members = clubMemberRepository.findByClubId(clubId, PageRequest.of(0, Integer.MAX_VALUE));
+        return members.getContent()
+                .stream()
+                .map(member -> new ClubMemberResponseDTO(
+                        member.getId(),
+                        member.getUserId(),
+                        member.getName(),
+                        member.getRating(),
+                        member.getTimesMvp(),
+                        member.getTimesChampion(),
+                        member.getTeamId(),
+                        member.getClubRole()
+                ))
+                .toList();
     }
 
     @Transactional

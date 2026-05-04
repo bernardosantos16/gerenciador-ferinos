@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.springframework.http.HttpStatus.NOT_FOUND;
@@ -41,9 +42,18 @@ public class ClubJerseyService {
     }
 
     @Transactional(readOnly = true)
-    public Page<ClubJerseyResponseDTO> listByClub(UUID clubId, Pageable pageable) {
+    public Page<ClubJerseyResponseDTO> pageByClub(UUID clubId, Pageable pageable) {
         clubAuthorizationService.requireMember(clubId);
         return clubJerseyRepository.findByClubId(clubId, pageable).map(ClubJerseyService::toResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ClubJerseyResponseDTO> listByClub(UUID clubId) {
+        clubAuthorizationService.requireMember(clubId);
+        return clubJerseyRepository.findByClubId(clubId)
+                .stream()
+                .map(ClubJerseyService::toResponse)
+                .toList();
     }
 
     public void delete(UUID clubId, Long jerseyId) {

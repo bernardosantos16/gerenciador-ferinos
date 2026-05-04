@@ -5,7 +5,10 @@ import com.bernardo.geradortimes.club.dto.request.CreateClubRequestDTO;
 import com.bernardo.geradortimes.club.dto.request.UpdateClubRequestDTO;
 import com.bernardo.geradortimes.club.dto.response.ClubResponseDTO;
 import com.bernardo.geradortimes.club.model.Club;
+import com.bernardo.geradortimes.club.repository.ClubMemberRepository;
 import com.bernardo.geradortimes.club.repository.ClubRepository;
+import com.bernardo.geradortimes.match.service.MatchService;
+import com.bernardo.geradortimes.shared.enums.ClubRole;
 import com.bernardo.geradortimes.shared.value_object.Nickname;
 import com.bernardo.geradortimes.user.model.User;
 import com.bernardo.geradortimes.user.repository.UserRepository;
@@ -13,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.springframework.http.HttpStatus.NOT_FOUND;
@@ -27,20 +31,24 @@ public class ClubService {
     private final UserRepository userRepository;
     private final CurrentUserService currentUserService;
     private final ClubAuthorizationService clubAuthorizationService;
+    private final ClubMemberRepository clubMemberRepository;
 
 
     public ClubService(
             ClubRepository clubRepository,
             ClubMemberService clubMemberService,
+            MatchService matchService,
             UserRepository userRepository,
             CurrentUserService currentUserService,
-            ClubAuthorizationService clubAuthorizationService
+            ClubAuthorizationService clubAuthorizationService,
+            ClubMemberRepository clubMemberRepository
     ) {
         this.clubRepository = clubRepository;
         this.clubMemberService = clubMemberService;
         this.userRepository = userRepository;
         this.currentUserService = currentUserService;
         this.clubAuthorizationService = clubAuthorizationService;
+        this.clubMemberRepository = clubMemberRepository;
     }
 
     public ClubResponseDTO createClub(CreateClubRequestDTO requestDTO) {
@@ -98,5 +106,13 @@ public class ClubService {
         club.deactivate();
         clubRepository.save(club);
         return new ClubResponseDTO(club.getId(), club.getName(), club.getNickname().getValue());
+    }
+
+    public List<ClubResponseDTO> listUserClubs(ClubRole clubRole) {
+        UUID userId = currentUserService.requireUserId();
+        List<Club> clubs = clubMemberRepository.findByUserIdAndClubRole(userId, clubRole);
+        return clubs.stream()
+                .map(club -> new ClubResponseDTO(club.getId(), club.getName(), club.getNickname().getValue()))
+                .toList();
     }
 }

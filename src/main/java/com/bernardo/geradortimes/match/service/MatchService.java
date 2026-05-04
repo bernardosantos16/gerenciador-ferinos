@@ -12,6 +12,7 @@ import com.bernardo.geradortimes.match.repository.MatchRepository;
 import com.bernardo.geradortimes.team.repository.TeamRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -97,6 +98,16 @@ public class MatchService {
         matchRepository.delete(match);
 
         log.info("partida deletada");
+    }
+
+    @Transactional(readOnly = true)
+    public List<MatchResponseDTO> getAllMatches(UUID clubId) {
+        clubAuthorizationService.requireMember(clubId);
+        return matchRepository.findByClubId(clubId, PageRequest.of(0, Integer.MAX_VALUE))
+                .getContent()
+                .stream()
+                .map(MatchService::toResponse)
+                .toList();
     }
 
     private static MatchResponseDTO toResponse(Match match) {

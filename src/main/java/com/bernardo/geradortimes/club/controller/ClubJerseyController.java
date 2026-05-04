@@ -23,6 +23,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -68,12 +69,11 @@ public class ClubJerseyController {
             @ApiResponse(responseCode = "403", description = "Usuario nao possui permissao (MEMBER requerido).",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
-    public Page<ClubJerseyResponseDTO> list(
+    public List<ClubJerseyResponseDTO> list(
             @Parameter(description = "ID do clube.", required = true, example = "c0a8012e-6f1f-4b4b-9f5e-7a8b9c0d1e2f")
-            @PathVariable UUID clubId,
-            @PageableDefault(size = 50) Pageable pageable
+            @PathVariable UUID clubId
     ) {
-        return clubJerseyService.listByClub(clubId, pageable);
+        return clubJerseyService.listByClub(clubId);
     }
 
     @PatchMapping("/{jerseyId}")

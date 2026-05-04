@@ -4,6 +4,7 @@ import com.bernardo.geradortimes.club.dto.request.CreateClubRequestDTO;
 import com.bernardo.geradortimes.club.dto.request.UpdateClubRequestDTO;
 import com.bernardo.geradortimes.club.dto.response.ClubResponseDTO;
 import com.bernardo.geradortimes.club.service.ClubService;
+import com.bernardo.geradortimes.shared.enums.ClubRole;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -18,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -65,6 +67,22 @@ public class ClubController {
             @PathVariable UUID id
     ){
         var response = clubService.getClub(id);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping
+    @Operation(summary = "Listar clubes do usuario por funcao",
+            description = "Lista os clubes do usuario autenticado, filtrando por funcao (MEMBER, DIRECTOR)."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Dashboard do clube obtida.",
+                    content = @Content(schema = @Schema(implementation = ClubResponseDTO.class))),
+            @ApiResponse(responseCode = "401", description = "Nao autenticado."),
+            @ApiResponse(responseCode = "404", description = "Clube nao encontrado.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    public ResponseEntity<List<ClubResponseDTO>> getClubDashboard(@RequestParam ClubRole clubRole) {
+        var response = clubService.listUserClubs(clubRole);
         return ResponseEntity.ok(response);
     }
 
