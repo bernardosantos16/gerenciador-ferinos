@@ -75,13 +75,13 @@ public class ClubController {
             description = "Lista os clubes do usuario autenticado, filtrando por funcao (MEMBER, DIRECTOR)."
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Dashboard do clube obtida.",
+            @ApiResponse(responseCode = "200", description = "Lista de clubes obtida.",
                     content = @Content(schema = @Schema(implementation = ClubResponseDTO.class))),
             @ApiResponse(responseCode = "401", description = "Nao autenticado."),
             @ApiResponse(responseCode = "404", description = "Clube nao encontrado.",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
-    public ResponseEntity<List<ClubResponseDTO>> getClubDashboard(@RequestParam ClubRole clubRole) {
+    public ResponseEntity<List<ClubResponseDTO>> getClubsByRole(@RequestParam ClubRole clubRole) {
         var response = clubService.listUserClubs(clubRole);
         return ResponseEntity.ok(response);
     }

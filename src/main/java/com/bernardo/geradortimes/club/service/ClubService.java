@@ -82,9 +82,10 @@ public class ClubService {
 
     @Transactional
     public ClubResponseDTO update(UUID clubId, UpdateClubRequestDTO request) {
-        clubAuthorizationService.requireDirector(clubId);
         Club club = clubRepository.findById(clubId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "club not found"));
+
+        clubAuthorizationService.requireDirector(clubId);
 
         if (request.name() != null && !request.name().isBlank()) {
             club.changeName(request.name());
@@ -99,9 +100,10 @@ public class ClubService {
 
     @Transactional
     public ClubResponseDTO softDelete(UUID clubId) {
-        clubAuthorizationService.requireDirector(clubId);
         Club club = clubRepository.findById(clubId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "club not found"));
+
+        clubAuthorizationService.requireDirector(clubId);
 
         club.deactivate();
         clubRepository.save(club);
