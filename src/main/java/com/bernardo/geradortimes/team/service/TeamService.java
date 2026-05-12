@@ -184,24 +184,30 @@ public class TeamService {
 
         List<Long> unassignedGoalkeepers = new ArrayList<>();
 
-        List<ScoredMember> scoredKeepers = new ArrayList<>(scoreMembers(goalkeeperMembers));
-        scoredKeepers.sort(Comparator
-                .comparingDouble(ScoredMember::score).reversed()
-                .thenComparingLong(ScoredMember::memberId));
+        if (goalkeeperMembers.size() == teamCount) {
+            List<ScoredMember> scoredKeepers = new ArrayList<>(scoreMembers(goalkeeperMembers));
+            scoredKeepers.sort(Comparator
+                    .comparingDouble(ScoredMember::score).reversed()
+                    .thenComparingLong(ScoredMember::memberId));
 
-        // Assign strongest keepers to weakest teams without a goalkeeper (1 per team).
-        for (ScoredMember keeper : scoredKeepers) {
-            TeamBucket weakest = buckets.stream()
-                    .filter(b -> b.goalkeeperMemberId == null)
-                    .min(Comparator.comparingDouble(TeamBucket::totalScore)
-                            .thenComparingLong(b -> b.teamId))
-                    .orElse(null);
+            // Assign strongest keepers to weakest teams without a goalkeeper (1 per team).
+            for (ScoredMember keeper : scoredKeepers) {
+                TeamBucket weakest = buckets.stream()
+                        .filter(b -> b.goalkeeperMemberId == null)
+                        .min(Comparator.comparingDouble(TeamBucket::totalScore)
+                                .thenComparingLong(b -> b.teamId))
+                        .orElse(null);
 
-            if (weakest != null) {
-                weakest.assignGoalkeeper(keeper);
-            } else {
-                unassignedGoalkeepers.add(keeper.memberId());
+                if (weakest != null) {
+                    weakest.assignGoalkeeper(keeper);
+                } else {
+                    // This shouldn't happen if sizes match
+                    unassignedGoalkeepers.add(keeper.memberId());
+                }
             }
+        } else {
+            // All goalkeepers unassigned
+            unassignedGoalkeepers.addAll(goalkeeperMembers.stream().map(ClubMember::getId).toList());
         }
 
         // Persist participants (confirmation + team assignment if applicable).

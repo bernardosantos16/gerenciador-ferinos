@@ -37,8 +37,8 @@ Contexto: implementado em `src/main/java/com/bernardo/geradortimes/team/service/
 
 ## Tratamento de goleiros
 - Calcula score para todos os goleiros, ordena do mais forte ao mais fraco.
-- Atribui cada goleiro ao bucket mais fraco que ainda não tem goleiro (1 por time).
-- Quando todos os times já têm goleiro, os excedentes vão para `unassignedGoalkeeperMemberIds` e são persistidos com `teamId = null`.
+- Se o número de goleiros for igual ao número de times, atribui cada goleiro ao bucket mais fraco que ainda não tem goleiro (1 por time), usando a lógica de balanceamento.
+- Caso contrário (se for diferente do número de times), todos os goleiros ficam como não atribuídos (`unassignedGoalkeeperMemberIds`) e são persistidos com `teamId = null`.
 
 ## Persistência
 - Antes de gerar, limpa dados anteriores da partida (`matchParticipantRepository.deleteByMatchId`, `teamRepository.deleteByMatchId`).
@@ -76,4 +76,3 @@ Contexto: implementado em `src/main/java/com/bernardo/geradortimes/team/service/
 ## Sugestões de melhoria futura
 - Tornar pesos configuráveis para rating/champion/mvp.
 - Permitir informar `teamCount` diretamente (em vez de derivar de `maxLinePlayers`).
-- Distribuir goleiros mesmo quando a contagem não bate, priorizando um goleiro por time e deixando excedentes como não atribuídos.

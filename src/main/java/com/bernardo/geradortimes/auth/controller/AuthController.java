@@ -85,7 +85,6 @@ public class AuthController {
             @CookieValue(name = "${auth.cookie.refresh-token-name:refreshToken}", required = false) String refreshTokenCookie,
             HttpServletResponse response
     ) {
-
         if (refreshTokenCookie == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "refresh token required");
         }
