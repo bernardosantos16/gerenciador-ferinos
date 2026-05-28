@@ -13,6 +13,12 @@ public record MatchResponseDTO(
         UUID clubId,
 
         @Schema(type = "string", format = "date-time", description = "Data e hora da partida (UTC).", example = "2026-03-20T22:00:00Z")
-        Instant dateTime
+        Instant dateTime,
+
+        @Schema(description = "ID do time campeao da partida, quando definido.", example = "1", nullable = true)
+        Long teamChampionId,
+
+        @Schema(description = "ID do membro MVP da partida, quando definido.", example = "10", nullable = true)
+        Long clubMemberMvpId
 ) {
 }

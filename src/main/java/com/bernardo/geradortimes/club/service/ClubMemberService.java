@@ -6,6 +6,7 @@ import com.bernardo.geradortimes.club.dto.response.ClubMemberResponseDTO;
 import com.bernardo.geradortimes.club.model.ClubMember;
 import com.bernardo.geradortimes.club.repository.ClubMemberRepository;
 import com.bernardo.geradortimes.shared.enums.ClubRole;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -18,6 +19,7 @@ import java.util.UUID;
 
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
+@Slf4j
 @Service
 @Transactional
 public class ClubMemberService {
@@ -117,6 +119,7 @@ public class ClubMemberService {
         }
 
         ClubMember saved = clubMemberRepository.save(member);
+        log.info("Membro atualizado - memberId: {}, clubId: {}, changes: {}", memberId, clubId, request);
         return toResponse(saved);
     }
 

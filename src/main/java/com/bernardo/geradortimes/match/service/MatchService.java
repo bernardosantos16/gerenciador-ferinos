@@ -1,7 +1,10 @@
 package com.bernardo.geradortimes.match.service;
 
+import com.bernardo.geradortimes.club.model.ClubMember;
+import com.bernardo.geradortimes.club.repository.ClubMemberRepository;
 import com.bernardo.geradortimes.club.service.ClubAuthorizationService;
 import com.bernardo.geradortimes.match.dto.request.CreateMatchRequestDTO;
+import com.bernardo.geradortimes.match.dto.request.SetMatchResultRequestDTO;
 import com.bernardo.geradortimes.match.dto.request.UpdateMatchRequestDTO;
 import com.bernardo.geradortimes.match.dto.response.MatchParticipantResponseDTO;
 import com.bernardo.geradortimes.match.dto.response.MatchResponseDTO;
@@ -9,6 +12,7 @@ import com.bernardo.geradortimes.match.model.Match;
 import com.bernardo.geradortimes.match.model.MatchParticipant;
 import com.bernardo.geradortimes.match.repository.MatchParticipantRepository;
 import com.bernardo.geradortimes.match.repository.MatchRepository;
+import com.bernardo.geradortimes.team.model.Team;
 import com.bernardo.geradortimes.team.repository.TeamRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -18,9 +22,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
+import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 @Slf4j
@@ -31,17 +44,20 @@ public class MatchService {
     private final MatchRepository matchRepository;
     private final MatchParticipantRepository matchParticipantRepository;
     private final TeamRepository teamRepository;
+    private final ClubMemberRepository clubMemberRepository;
     private final ClubAuthorizationService clubAuthorizationService;
 
     public MatchService(
             MatchRepository matchRepository,
             MatchParticipantRepository matchParticipantRepository,
             TeamRepository teamRepository,
+            ClubMemberRepository clubMemberRepository,
             ClubAuthorizationService clubAuthorizationService
     ) {
         this.matchRepository = matchRepository;
         this.matchParticipantRepository = matchParticipantRepository;
         this.teamRepository = teamRepository;
+        this.clubMemberRepository = clubMemberRepository;
         this.clubAuthorizationService = clubAuthorizationService;
     }
 
@@ -80,16 +96,70 @@ public class MatchService {
         Match match = matchRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "match not found"));
         clubAuthorizationService.requireDirector(match.getClubId());
+        if (match.hasResult()) {
+            throw new ResponseStatusException(BAD_REQUEST, "match result already set");
+        }
 
         match.updateDateTime(request.dateTime());
         Match saved = matchRepository.save(match);
         return toResponse(saved);
     }
 
-    public void delete(UUID id) {
-        Match match = matchRepository.findById(id)
+    public MatchResponseDTO setResult(UUID id, SetMatchResultRequestDTO request) {
+        Match match = matchRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "match not found"));
         clubAuthorizationService.requireDirector(match.getClubId());
+
+        validateMatchAlreadyPlayed(match);
+        validateTeamInMatch(match.getId(), request.teamChampionId());
+
+        List<MatchParticipant> championParticipants = matchParticipantRepository.findByMatchIdAndTeamId(
+                match.getId(),
+                request.teamChampionId()
+        );
+        if (championParticipants.isEmpty()) {
+            throw new ResponseStatusException(BAD_REQUEST, "champion team has no participants");
+        }
+
+        MatchParticipant mvpParticipant = matchParticipantRepository
+                .findByMatchIdAndClubMemberId(match.getId(), request.clubMemberMvpId())
+                .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "mvp member is not a participant in this match"));
+        validateMvpParticipantAssignedToMatchTeam(match.getId(), mvpParticipant);
+
+        Set<Long> selectedMemberIds = new HashSet<>();
+        championParticipants.forEach(participant -> selectedMemberIds.add(participant.getClubMemberId()));
+        selectedMemberIds.add(request.clubMemberMvpId());
+        validateMembersBelongToClub(match.getClubId(), selectedMemberIds);
+
+        if (Objects.equals(match.getTeamChampionId(), request.teamChampionId())
+                && Objects.equals(match.getClubMemberMvpId(), request.clubMemberMvpId())) {
+            return toResponse(match);
+        }
+
+        Map<Long, Integer> championDeltas = buildChampionDeltas(match, request.teamChampionId(), championParticipants);
+        Map<Long, Integer> mvpDeltas = buildMvpDeltas(match, request.clubMemberMvpId());
+
+        applyDeltas(match.getClubId(), championDeltas, clubMemberRepository::incrementTimesChampion);
+        applyDeltas(match.getClubId(), mvpDeltas, clubMemberRepository::incrementTimesMvp);
+
+        match.setResult(request.teamChampionId(), request.clubMemberMvpId());
+        Match saved = matchRepository.save(match);
+        log.info(
+                "resultado da partida atualizado matchId={} teamChampionId={} clubMemberMvpId={}",
+                saved.getId(),
+                saved.getTeamChampionId(),
+                saved.getClubMemberMvpId()
+        );
+        return toResponse(saved);
+    }
+
+    public void delete(UUID id) {
+        Match match = matchRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "match not found"));
+        clubAuthorizationService.requireDirector(match.getClubId());
+
+        reverseResultCounters(match);
+        match.clearResult();
 
         // Clean up dependent data first.
         matchParticipantRepository.deleteByMatchId(id);
@@ -111,7 +181,13 @@ public class MatchService {
     }
 
     private static MatchResponseDTO toResponse(Match match) {
-        return new MatchResponseDTO(match.getId(), match.getClubId(), match.getDateTime());
+        return new MatchResponseDTO(
+                match.getId(),
+                match.getClubId(),
+                match.getDateTime(),
+                match.getTeamChampionId(),
+                match.getClubMemberMvpId()
+        );
     }
 
     private static MatchParticipantResponseDTO toResponse(MatchParticipant participant) {
@@ -122,5 +198,113 @@ public class MatchService {
                 participant.getPosition(),
                 participant.getTeamId()
         );
+    }
+
+    private static void validateMatchAlreadyPlayed(Match match) {
+        if (!match.getDateTime().isBefore(Instant.now())) {
+            throw new ResponseStatusException(BAD_REQUEST, "match must be in the past to set result");
+        }
+    }
+
+    private void validateTeamInMatch(UUID matchId, Long teamId) {
+        Team team = teamRepository.findById(teamId)
+                .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "champion team is not in this match"));
+        if (!matchId.equals(team.getMatchId())) {
+            throw new ResponseStatusException(BAD_REQUEST, "champion team is not in this match");
+        }
+    }
+
+    private void validateMvpParticipantAssignedToMatchTeam(UUID matchId, MatchParticipant participant) {
+        if (participant.getTeamId() == null || !teamRepository.existsByIdAndMatchId(participant.getTeamId(), matchId)) {
+            throw new ResponseStatusException(BAD_REQUEST, "mvp member is not assigned to a team in this match");
+        }
+    }
+
+    private void validateMembersBelongToClub(UUID clubId, Set<Long> memberIds) {
+        if (memberIds.isEmpty()) {
+            return;
+        }
+
+        List<ClubMember> members = clubMemberRepository.findByClubIdAndIdIn(clubId, memberIds);
+        Set<Long> foundIds = new HashSet<>();
+        members.forEach(member -> foundIds.add(member.getId()));
+        if (foundIds.size() != memberIds.size()) {
+            throw new ResponseStatusException(BAD_REQUEST, "all selected participants must belong to the match club");
+        }
+    }
+
+    private Map<Long, Integer> buildChampionDeltas(
+            Match match,
+            Long newChampionTeamId,
+            List<MatchParticipant> newChampionParticipants
+    ) {
+        Map<Long, Integer> deltas = new HashMap<>();
+        Long previousChampionTeamId = match.getTeamChampionId();
+        if (Objects.equals(previousChampionTeamId, newChampionTeamId)) {
+            return deltas;
+        }
+
+        if (previousChampionTeamId != null) {
+            matchParticipantRepository.findByMatchIdAndTeamId(match.getId(), previousChampionTeamId)
+                    .forEach(participant -> addDelta(deltas, participant.getClubMemberId(), -1));
+        }
+
+        newChampionParticipants.forEach(participant -> addDelta(deltas, participant.getClubMemberId(), 1));
+        return deltas;
+    }
+
+    private static Map<Long, Integer> buildMvpDeltas(Match match, Long newMvpMemberId) {
+        Map<Long, Integer> deltas = new HashMap<>();
+        Long previousMvpMemberId = match.getClubMemberMvpId();
+        if (Objects.equals(previousMvpMemberId, newMvpMemberId)) {
+            return deltas;
+        }
+
+        if (previousMvpMemberId != null) {
+            addDelta(deltas, previousMvpMemberId, -1);
+        }
+        addDelta(deltas, newMvpMemberId, 1);
+        return deltas;
+    }
+
+    private void reverseResultCounters(Match match) {
+        Map<Long, Integer> championDeltas = new HashMap<>();
+        if (match.getTeamChampionId() != null) {
+            matchParticipantRepository.findByMatchIdAndTeamId(match.getId(), match.getTeamChampionId())
+                    .forEach(participant -> addDelta(championDeltas, participant.getClubMemberId(), -1));
+        }
+
+        Map<Long, Integer> mvpDeltas = new HashMap<>();
+        if (match.getClubMemberMvpId() != null) {
+            addDelta(mvpDeltas, match.getClubMemberMvpId(), -1);
+        }
+
+        applyDeltas(match.getClubId(), championDeltas, clubMemberRepository::incrementTimesChampion);
+        applyDeltas(match.getClubId(), mvpDeltas, clubMemberRepository::incrementTimesMvp);
+    }
+
+    private static void addDelta(Map<Long, Integer> deltas, Long memberId, int delta) {
+        deltas.merge(memberId, delta, Integer::sum);
+        if (deltas.get(memberId) == 0) {
+            deltas.remove(memberId);
+        }
+    }
+
+    private static void applyDeltas(UUID clubId, Map<Long, Integer> deltas, StatIncrementer incrementer) {
+        if (deltas.isEmpty()) {
+            return;
+        }
+
+        Map<Integer, List<Long>> memberIdsByDelta = new HashMap<>();
+        deltas.forEach((memberId, delta) -> memberIdsByDelta
+                .computeIfAbsent(delta, ignored -> new ArrayList<>())
+                .add(memberId));
+
+        memberIdsByDelta.forEach((delta, memberIds) -> incrementer.increment(clubId, memberIds, delta));
+    }
+
+    @FunctionalInterface
+    private interface StatIncrementer {
+        int increment(UUID clubId, Collection<Long> memberIds, int delta);
     }
 }

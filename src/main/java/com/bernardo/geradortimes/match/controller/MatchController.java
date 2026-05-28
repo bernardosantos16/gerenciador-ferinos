@@ -1,6 +1,7 @@
 package com.bernardo.geradortimes.match.controller;
 
 import com.bernardo.geradortimes.match.dto.request.CreateMatchRequestDTO;
+import com.bernardo.geradortimes.match.dto.request.SetMatchResultRequestDTO;
 import com.bernardo.geradortimes.match.dto.request.UpdateMatchRequestDTO;
 import com.bernardo.geradortimes.match.dto.response.MatchParticipantResponseDTO;
 import com.bernardo.geradortimes.match.dto.response.MatchResponseDTO;
@@ -135,6 +136,34 @@ public class MatchController {
             @PathVariable UUID id
     ) {
         return matchService.listParticipants(id);
+    }
+
+    @PatchMapping("/{id}/result")
+    @Operation(
+            summary = "Definir resultado da partida",
+            description = """
+                    Define o time campeao e o MVP de uma partida ja realizada.
+                    Requer DIRECTOR do clube. O backend valida que o time pertence a partida,
+                    que o MVP participou da partida e atualiza os contadores de forma idempotente.
+                    """
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Resultado definido.",
+                    content = @Content(schema = @Schema(implementation = MatchResponseDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Resultado invalido para a partida.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "401", description = "Nao autenticado."),
+            @ApiResponse(responseCode = "403", description = "Usuario nao possui permissao (DIRECTOR requerido).",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "404", description = "Partida nao encontrada.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    public MatchResponseDTO setResult(
+            @Parameter(description = "ID da partida.", required = true, example = "f47ac10b-58cc-4372-a567-0e02b2c3d479")
+            @PathVariable UUID id,
+            @Valid @RequestBody SetMatchResultRequestDTO request
+    ) {
+        return matchService.setResult(id, request);
     }
 
     @DeleteMapping("/{id}")

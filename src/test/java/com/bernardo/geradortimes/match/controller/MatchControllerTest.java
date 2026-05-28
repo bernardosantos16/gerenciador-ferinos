@@ -3,6 +3,7 @@ package com.bernardo.geradortimes.match.controller;
 import com.bernardo.geradortimes.club.model.Club;
 import com.bernardo.geradortimes.club.model.ClubMember;
 import com.bernardo.geradortimes.match.dto.request.CreateMatchRequestDTO;
+import com.bernardo.geradortimes.match.dto.request.SetMatchResultRequestDTO;
 import com.bernardo.geradortimes.match.model.Match;
 import com.bernardo.geradortimes.match.model.MatchParticipant;
 import com.bernardo.geradortimes.match.repository.MatchParticipantRepository;
@@ -10,6 +11,8 @@ import com.bernardo.geradortimes.match.repository.MatchRepository;
 import com.bernardo.geradortimes.shared.enums.ClubRole;
 import com.bernardo.geradortimes.shared.enums.MatchParticipantPosition;
 import com.bernardo.geradortimes.support.IntegrationTestBase;
+import com.bernardo.geradortimes.team.model.Team;
+import com.bernardo.geradortimes.team.repository.TeamRepository;
 import com.bernardo.geradortimes.user.model.User;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -21,6 +24,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.hamcrest.Matchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -39,10 +43,21 @@ class MatchControllerTest extends IntegrationTestBase {
     @Autowired
     private MatchParticipantRepository matchParticipantRepository;
 
+    @Autowired
+    private TeamRepository teamRepository;
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private Match persistMatch(UUID clubId) {
         return matchRepository.save(Match.create(clubId, Instant.now().plus(1, ChronoUnit.DAYS)));
+    }
+
+    private Match persistPastMatch(UUID clubId) {
+        return matchRepository.save(Match.create(clubId, Instant.now().minus(1, ChronoUnit.DAYS)));
+    }
+
+    private Team persistTeam(UUID matchId) {
+        return teamRepository.save(Team.create(matchId, null));
     }
 
     // ── POST /api/matches ─────────────────────────────────────────────────────
@@ -263,6 +278,215 @@ class MatchControllerTest extends IntegrationTestBase {
         }
     }
 
+    // ── PATCH /api/matches/{id}/result ───────────────────────────────────────
+
+    @Nested
+    @DisplayName("PATCH /api/matches/{id}/result")
+    class SetResult {
+
+        @Test
+        @DisplayName("deve definir campeao e MVP, incrementando estatisticas dos membros corretos")
+        void setResultSuccess() throws Exception {
+            User director = createActiveUser("director_result@match.com", "director_result");
+            Club club = createClub("Clube Resultado", "clube_resultado");
+            createClubMember(director.getId(), club.getId(), ClubRole.DIRECTOR);
+            ClubMember player1 = createClubMember(null, club.getId(), ClubRole.MEMBER);
+            ClubMember player2 = createClubMember(null, club.getId(), ClubRole.MEMBER);
+            Match match = persistPastMatch(club.getId());
+            Team championTeam = persistTeam(match.getId());
+
+            matchParticipantRepository.save(MatchParticipant.create(
+                    match.getId(),
+                    player1.getId(),
+                    MatchParticipantPosition.LINE,
+                    championTeam.getId()
+            ));
+            matchParticipantRepository.save(MatchParticipant.create(
+                    match.getId(),
+                    player2.getId(),
+                    MatchParticipantPosition.LINE,
+                    championTeam.getId()
+            ));
+
+            var request = new SetMatchResultRequestDTO(championTeam.getId(), player2.getId());
+
+            mockMvc.perform(patch("/api/matches/{id}/result", match.getId())
+                            .header("Authorization", bearerToken(director))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(request)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.teamChampionId", is(championTeam.getId().intValue())))
+                    .andExpect(jsonPath("$.clubMemberMvpId", is(player2.getId().intValue())));
+
+            ClubMember updatedPlayer1 = clubMemberRepository.findById(player1.getId()).orElseThrow();
+            ClubMember updatedPlayer2 = clubMemberRepository.findById(player2.getId()).orElseThrow();
+            assertEquals(1, updatedPlayer1.getTimesChampion());
+            assertEquals(0, updatedPlayer1.getTimesMvp());
+            assertEquals(1, updatedPlayer2.getTimesChampion());
+            assertEquals(1, updatedPlayer2.getTimesMvp());
+        }
+
+        @Test
+        @DisplayName("deve ser idempotente quando o mesmo resultado é enviado novamente")
+        void setResultIdempotent() throws Exception {
+            User director = createActiveUser("director_idempotent@match.com", "director_idempotent");
+            Club club = createClub("Clube Idempotente", "clube_idempotente");
+            createClubMember(director.getId(), club.getId(), ClubRole.DIRECTOR);
+            ClubMember player = createClubMember(null, club.getId(), ClubRole.MEMBER);
+            Match match = persistPastMatch(club.getId());
+            Team championTeam = persistTeam(match.getId());
+            matchParticipantRepository.save(MatchParticipant.create(
+                    match.getId(),
+                    player.getId(),
+                    MatchParticipantPosition.LINE,
+                    championTeam.getId()
+            ));
+
+            var request = new SetMatchResultRequestDTO(championTeam.getId(), player.getId());
+
+            mockMvc.perform(patch("/api/matches/{id}/result", match.getId())
+                            .header("Authorization", bearerToken(director))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(request)))
+                    .andExpect(status().isOk());
+            mockMvc.perform(patch("/api/matches/{id}/result", match.getId())
+                            .header("Authorization", bearerToken(director))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(request)))
+                    .andExpect(status().isOk());
+
+            ClubMember updatedPlayer = clubMemberRepository.findById(player.getId()).orElseThrow();
+            assertEquals(1, updatedPlayer.getTimesChampion());
+            assertEquals(1, updatedPlayer.getTimesMvp());
+        }
+
+        @Test
+        @DisplayName("deve compensar estatisticas ao trocar campeao e MVP")
+        void setResultChangeCompensatesPreviousStats() throws Exception {
+            User director = createActiveUser("director_change_result@match.com", "director_change_result");
+            Club club = createClub("Clube Troca Resultado", "clube_troca_resultado");
+            createClubMember(director.getId(), club.getId(), ClubRole.DIRECTOR);
+            ClubMember player1 = createClubMember(null, club.getId(), ClubRole.MEMBER);
+            ClubMember player2 = createClubMember(null, club.getId(), ClubRole.MEMBER);
+            ClubMember player3 = createClubMember(null, club.getId(), ClubRole.MEMBER);
+            ClubMember player4 = createClubMember(null, club.getId(), ClubRole.MEMBER);
+            Match match = persistPastMatch(club.getId());
+            Team team1 = persistTeam(match.getId());
+            Team team2 = persistTeam(match.getId());
+
+            matchParticipantRepository.save(MatchParticipant.create(match.getId(), player1.getId(), MatchParticipantPosition.LINE, team1.getId()));
+            matchParticipantRepository.save(MatchParticipant.create(match.getId(), player2.getId(), MatchParticipantPosition.LINE, team1.getId()));
+            matchParticipantRepository.save(MatchParticipant.create(match.getId(), player3.getId(), MatchParticipantPosition.LINE, team2.getId()));
+            matchParticipantRepository.save(MatchParticipant.create(match.getId(), player4.getId(), MatchParticipantPosition.LINE, team2.getId()));
+
+            mockMvc.perform(patch("/api/matches/{id}/result", match.getId())
+                            .header("Authorization", bearerToken(director))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(new SetMatchResultRequestDTO(team1.getId(), player2.getId()))))
+                    .andExpect(status().isOk());
+            mockMvc.perform(patch("/api/matches/{id}/result", match.getId())
+                            .header("Authorization", bearerToken(director))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(new SetMatchResultRequestDTO(team2.getId(), player3.getId()))))
+                    .andExpect(status().isOk());
+
+            ClubMember updatedPlayer1 = clubMemberRepository.findById(player1.getId()).orElseThrow();
+            ClubMember updatedPlayer2 = clubMemberRepository.findById(player2.getId()).orElseThrow();
+            ClubMember updatedPlayer3 = clubMemberRepository.findById(player3.getId()).orElseThrow();
+            ClubMember updatedPlayer4 = clubMemberRepository.findById(player4.getId()).orElseThrow();
+            assertEquals(0, updatedPlayer1.getTimesChampion());
+            assertEquals(0, updatedPlayer2.getTimesChampion());
+            assertEquals(0, updatedPlayer2.getTimesMvp());
+            assertEquals(1, updatedPlayer3.getTimesChampion());
+            assertEquals(1, updatedPlayer3.getTimesMvp());
+            assertEquals(1, updatedPlayer4.getTimesChampion());
+        }
+
+        @Test
+        @DisplayName("deve retornar 400 quando a partida ainda não foi realizada")
+        void setResultFutureMatch() throws Exception {
+            User director = createActiveUser("director_future_result@match.com", "director_future_result");
+            Club club = createClub("Clube Resultado Futuro", "clube_resultado_futuro");
+            createClubMember(director.getId(), club.getId(), ClubRole.DIRECTOR);
+            ClubMember player = createClubMember(null, club.getId(), ClubRole.MEMBER);
+            Match match = persistMatch(club.getId());
+            Team team = persistTeam(match.getId());
+            matchParticipantRepository.save(MatchParticipant.create(match.getId(), player.getId(), MatchParticipantPosition.LINE, team.getId()));
+
+            var request = new SetMatchResultRequestDTO(team.getId(), player.getId());
+
+            mockMvc.perform(patch("/api/matches/{id}/result", match.getId())
+                            .header("Authorization", bearerToken(director))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(request)))
+                    .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("deve retornar 400 quando o MVP não está na partida")
+        void setResultMvpNotParticipant() throws Exception {
+            User director = createActiveUser("director_mvp_out@match.com", "director_mvp_out");
+            Club club = createClub("Clube MVP Fora", "clube_mvp_fora");
+            createClubMember(director.getId(), club.getId(), ClubRole.DIRECTOR);
+            ClubMember player = createClubMember(null, club.getId(), ClubRole.MEMBER);
+            ClubMember notParticipant = createClubMember(null, club.getId(), ClubRole.MEMBER);
+            Match match = persistPastMatch(club.getId());
+            Team team = persistTeam(match.getId());
+            matchParticipantRepository.save(MatchParticipant.create(match.getId(), player.getId(), MatchParticipantPosition.LINE, team.getId()));
+
+            var request = new SetMatchResultRequestDTO(team.getId(), notParticipant.getId());
+
+            mockMvc.perform(patch("/api/matches/{id}/result", match.getId())
+                            .header("Authorization", bearerToken(director))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(request)))
+                    .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("deve retornar 400 quando participante injetado não pertence ao clube da partida")
+        void setResultRejectsParticipantOutsideMatchClub() throws Exception {
+            User director = createActiveUser("director_bad_participant@match.com", "director_bad_participant");
+            Club club = createClub("Clube Participante Valido", "clube_participante_valido");
+            Club otherClub = createClub("Clube Participante Invalido", "clube_participante_invalido");
+            createClubMember(director.getId(), club.getId(), ClubRole.DIRECTOR);
+            ClubMember validPlayer = createClubMember(null, club.getId(), ClubRole.MEMBER);
+            ClubMember outsidePlayer = createClubMember(null, otherClub.getId(), ClubRole.MEMBER);
+            Match match = persistPastMatch(club.getId());
+            Team team = persistTeam(match.getId());
+            matchParticipantRepository.save(MatchParticipant.create(match.getId(), validPlayer.getId(), MatchParticipantPosition.LINE, team.getId()));
+            matchParticipantRepository.save(MatchParticipant.create(match.getId(), outsidePlayer.getId(), MatchParticipantPosition.LINE, team.getId()));
+
+            var request = new SetMatchResultRequestDTO(team.getId(), validPlayer.getId());
+
+            mockMvc.perform(patch("/api/matches/{id}/result", match.getId())
+                            .header("Authorization", bearerToken(director))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(request)))
+                    .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("deve retornar 403 quando MEMBER tenta definir resultado")
+        void setResultForbiddenForMember() throws Exception {
+            User member = createActiveUser("member_result@match.com", "member_result");
+            Club club = createClub("Clube Resultado Member", "clube_resultado_member");
+            createClubMember(member.getId(), club.getId(), ClubRole.MEMBER);
+            ClubMember player = createClubMember(null, club.getId(), ClubRole.MEMBER);
+            Match match = persistPastMatch(club.getId());
+            Team team = persistTeam(match.getId());
+            matchParticipantRepository.save(MatchParticipant.create(match.getId(), player.getId(), MatchParticipantPosition.LINE, team.getId()));
+
+            var request = new SetMatchResultRequestDTO(team.getId(), player.getId());
+
+            mockMvc.perform(patch("/api/matches/{id}/result", match.getId())
+                            .header("Authorization", bearerToken(member))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(request)))
+                    .andExpect(status().isForbidden());
+        }
+    }
+
     // ── DELETE /api/matches/{id} ──────────────────────────────────────────────
 
     @Nested
@@ -312,4 +536,3 @@ class MatchControllerTest extends IntegrationTestBase {
         }
     }
 }
-

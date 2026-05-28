@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.*;
 import java.net.URI;
 import java.util.UUID;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/clubs/{clubId}/members")
 @Tag(name = "Club Members", description = "Membros de um clube (jogadores), com ou sem usuario cadastrado.")
@@ -97,6 +99,7 @@ public class ClubMemberController {
             @PathVariable Long memberId,
             @Valid @RequestBody UpdateClubMemberRequestDTO request
     ) {
+        log.info("Atualizando membro {} do clube {}: {}", memberId, clubId, request);
         return ResponseEntity.ok(clubMemberService.updateMember(clubId, memberId, request));
     }
 

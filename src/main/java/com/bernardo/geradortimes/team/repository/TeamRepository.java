@@ -16,5 +16,7 @@ public interface TeamRepository extends JpaRepository<Team, Long> {
 
     Page<Team> findByMatchId(UUID matchId, Pageable pageable);
 
+    boolean existsByIdAndMatchId(Long id, UUID matchId);
+
     void deleteByMatchId(UUID matchId);
 }

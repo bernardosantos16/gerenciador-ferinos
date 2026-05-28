@@ -72,6 +72,7 @@ public class TeamService {
     public TeamResponseDTO create(CreateTeamRequestDTO request) {
         Match match = requireMatch(request.matchId());
         clubAuthorizationService.requireDirector(match.getClubId());
+        ensureMatchResultNotSet(match);
         validateJersey(match.getClubId(), request.clubJerseyId());
         Team team = Team.create(request.matchId(), request.clubJerseyId());
         Team saved = teamRepository.save(team);
@@ -136,6 +137,7 @@ public class TeamService {
         Match match = matchRepository.findById(matchId)
                 .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "match not found: " + matchId));
         clubAuthorizationService.requireDirector(match.getClubId());
+        ensureMatchResultNotSet(match);
 
         if (maxLinePlayers < 1) {
             throw new ResponseStatusException(BAD_REQUEST, "maxLinePlayers must be >= 1");
@@ -273,6 +275,7 @@ public class TeamService {
         Match match = matchRepository.findById(matchId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "match not found"));
         clubAuthorizationService.requireDirector(match.getClubId());
+        ensureMatchResultNotSet(match);
 
         // Validate that teams have been generated for this match
         List<Team> teams = teamRepository.findByMatchId(matchId);
@@ -349,6 +352,7 @@ public class TeamService {
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "team not found"));
         Match match = requireMatch(team.getMatchId());
         clubAuthorizationService.requireDirector(match.getClubId());
+        ensureMatchResultNotSet(match);
         teamRepository.delete(team);
     }
 
@@ -401,6 +405,12 @@ public class TeamService {
                 .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "jersey not found"));
         if (!clubId.equals(jersey.getClubId())) {
             throw new ResponseStatusException(BAD_REQUEST, "jersey not in club");
+        }
+    }
+
+    private static void ensureMatchResultNotSet(Match match) {
+        if (match.hasResult()) {
+            throw new ResponseStatusException(BAD_REQUEST, "match result already set");
         }
     }
 

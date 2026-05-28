@@ -68,17 +68,17 @@ public class AuthService {
 
     public AuthTokens refresh(RefreshTokenRequestDTO request) {
         RefreshToken current = refreshTokenService.findByTokenValue(request.refreshToken())
-                .orElseThrow(() -> new ResponseStatusException(UNAUTHORIZED, "invalid refresh token"));
+                .orElseThrow(() -> new ResponseStatusException(UNAUTHORIZED, "invalid refresh token - token not found"));
 
         if (current.isRevoked() || current.isExpired()) {
-            throw new ResponseStatusException(UNAUTHORIZED, "invalid refresh token");
+            throw new ResponseStatusException(UNAUTHORIZED, "invalid refresh token - token revoked or expired");
         }
 
         User user = userRepository.findById(current.getUserId())
-                .orElseThrow(() -> new ResponseStatusException(UNAUTHORIZED, "invalid refresh token"));
+                .orElseThrow(() -> new ResponseStatusException(UNAUTHORIZED, "invalid refresh token - user not found"));
 
         if (user.getStatus() == ActivityStatus.INACTIVE) {
-            throw new ResponseStatusException(UNAUTHORIZED, "invalid refresh token");
+            throw new ResponseStatusException(UNAUTHORIZED, "invalid refresh token - user inactive");
         }
 
         String accessToken = jwtService.issueAccessToken(user);

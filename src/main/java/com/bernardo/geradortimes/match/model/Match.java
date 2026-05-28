@@ -26,6 +26,12 @@ public class Match {
     @Column(name = "date_time", nullable = false)
     private Instant dateTime;
 
+    @Column(name = "team_champion_id")
+    private Long teamChampionId;
+
+    @Column(name = "club_member_mvp_id")
+    private Long clubMemberMvpId;
+
     protected Match() {}
 
     private Match(UUID clubId, Instant dateTime) {
@@ -39,5 +45,19 @@ public class Match {
 
     public void updateDateTime(Instant dateTime) {
         this.dateTime = dateTime;
+    }
+
+    public void setResult(Long teamChampionId, Long clubMemberMvpId) {
+        this.teamChampionId = teamChampionId;
+        this.clubMemberMvpId = clubMemberMvpId;
+    }
+
+    public void clearResult() {
+        this.teamChampionId = null;
+        this.clubMemberMvpId = null;
+    }
+
+    public boolean hasResult() {
+        return teamChampionId != null || clubMemberMvpId != null;
     }
 }
