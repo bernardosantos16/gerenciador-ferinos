@@ -52,11 +52,6 @@ public class Match {
         this.clubMemberMvpId = clubMemberMvpId;
     }
 
-    public void clearResult() {
-        this.teamChampionId = null;
-        this.clubMemberMvpId = null;
-    }
-
     public boolean hasResult() {
         return teamChampionId != null || clubMemberMvpId != null;
     }

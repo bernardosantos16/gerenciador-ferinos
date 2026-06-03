@@ -120,6 +120,26 @@ public class MatchController {
         return matchService.listByClub(clubId, pageable);
     }
 
+    @GetMapping("/upcoming")
+    @Operation(
+            summary = "Listar partidas que que virão por clube",
+            description = "Lista as partidas de um clube que tem a data maior que agora. Requer que o usuario autenticado seja MEMBER do clube."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lista de partidas.",
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = MatchResponseDTO.class)))),
+            @ApiResponse(responseCode = "401", description = "Nao autenticado."),
+            @ApiResponse(responseCode = "403", description = "Usuario nao possui permissao (MEMBER requerido).",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    public Page<MatchResponseDTO> listByClubAndUpcoming(
+            @Parameter(description = "ID do clube.", required = true, example = "c0a8012e-6f1f-4b4b-9f5e-7a8b9c0d1e2f")
+            @RequestParam UUID clubId,
+            @PageableDefault(size = 50) Pageable pageable
+    ) {
+        return matchService.listByClubAndUpcoming(clubId ,pageable);
+    }
+
     @GetMapping("/{id}/participants")
     @Operation(summary = "Listar participantes de uma partida")
     @ApiResponses({

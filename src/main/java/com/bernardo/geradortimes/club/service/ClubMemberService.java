@@ -114,6 +114,13 @@ public class ClubMemberService {
         if (request.rating() != null) {
             member.changeRating(request.rating());
         }
+        if (request.timesChampion() != null) {
+            member.changeTimesChampion(request.timesChampion());
+        }
+        if (request.timesMvp() != null) {
+            member.changeTimesMvp(request.timesMvp());
+        }
+
         if (request.clubRole() != null) {
             member.changeRole(request.clubRole());
         }

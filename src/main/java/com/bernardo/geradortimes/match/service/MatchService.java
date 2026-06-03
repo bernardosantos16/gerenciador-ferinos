@@ -85,6 +85,13 @@ public class MatchService {
     }
 
     @Transactional(readOnly = true)
+    public Page<MatchResponseDTO> listByClubAndUpcoming(UUID clubId, Pageable pageable) {
+        clubAuthorizationService.requireMember(clubId);
+        return matchRepository.findByClubIdAndDateTimeAfter(clubId, Instant.now(), pageable)
+                .map(MatchService::toResponse);
+    }
+
+    @Transactional(readOnly = true)
     public List<MatchParticipantResponseDTO> listParticipants(UUID matchId) {
         Match match = matchRepository.findById(matchId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "match not found"));
@@ -109,6 +116,7 @@ public class MatchService {
         Match match = matchRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "match not found"));
         clubAuthorizationService.requireDirector(match.getClubId());
+        ensureMatchResultNotSet(match);
 
         validateMatchAlreadyPlayed(match);
         validateTeamInMatch(match.getId(), request.teamChampionId());
@@ -131,11 +139,6 @@ public class MatchService {
         selectedMemberIds.add(request.clubMemberMvpId());
         validateMembersBelongToClub(match.getClubId(), selectedMemberIds);
 
-        if (Objects.equals(match.getTeamChampionId(), request.teamChampionId())
-                && Objects.equals(match.getClubMemberMvpId(), request.clubMemberMvpId())) {
-            return toResponse(match);
-        }
-
         Map<Long, Integer> championDeltas = buildChampionDeltas(match, request.teamChampionId(), championParticipants);
         Map<Long, Integer> mvpDeltas = buildMvpDeltas(match, request.clubMemberMvpId());
 
@@ -145,7 +148,7 @@ public class MatchService {
         match.setResult(request.teamChampionId(), request.clubMemberMvpId());
         Match saved = matchRepository.save(match);
         log.info(
-                "resultado da partida atualizado matchId={} teamChampionId={} clubMemberMvpId={}",
+                "resultado da partida matchId={} teamChampionId={} clubMemberMvpId={} confirmado",
                 saved.getId(),
                 saved.getTeamChampionId(),
                 saved.getClubMemberMvpId()
@@ -157,9 +160,7 @@ public class MatchService {
         Match match = matchRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "match not found"));
         clubAuthorizationService.requireDirector(match.getClubId());
-
-        reverseResultCounters(match);
-        match.clearResult();
+        ensureMatchResultNotSet(match);
 
         // Clean up dependent data first.
         matchParticipantRepository.deleteByMatchId(id);
@@ -203,6 +204,12 @@ public class MatchService {
     private static void validateMatchAlreadyPlayed(Match match) {
         if (!match.getDateTime().isBefore(Instant.now())) {
             throw new ResponseStatusException(BAD_REQUEST, "match must be in the past to set result");
+        }
+    }
+
+    private static void ensureMatchResultNotSet(Match match) {
+        if (match.hasResult()) {
+            throw new ResponseStatusException(BAD_REQUEST, "match result already set");
         }
     }
 
@@ -305,6 +312,6 @@ public class MatchService {
 
     @FunctionalInterface
     private interface StatIncrementer {
-        int increment(UUID clubId, Collection<Long> memberIds, int delta);
+        void increment(UUID clubId, Collection<Long> memberIds, int delta);
     }
 }

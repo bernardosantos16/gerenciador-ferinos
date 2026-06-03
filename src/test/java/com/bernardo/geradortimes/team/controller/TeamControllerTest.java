@@ -15,6 +15,7 @@ import com.bernardo.geradortimes.team.dto.request.GenerateTeamsRequestDTO;
 import com.bernardo.geradortimes.team.dto.request.PlayerSwapDTO;
 import com.bernardo.geradortimes.team.dto.request.SwapPlayersRequestDTO;
 import com.bernardo.geradortimes.team.dto.request.UpdateTeamJerseyRequestDTO;
+import com.bernardo.geradortimes.team.dto.request.UpdateTeamRequestDTO;
 import com.bernardo.geradortimes.team.model.Team;
 import com.bernardo.geradortimes.team.repository.TeamRepository;
 import com.bernardo.geradortimes.user.model.User;
@@ -58,6 +59,11 @@ class TeamControllerTest extends IntegrationTestBase {
 
     private Team persistTeam(UUID matchId, Long jerseyId) {
         return teamRepository.save(Team.create(matchId, jerseyId));
+    }
+
+    private void markMatchResult(Match match, Long teamId, Long clubMemberMvpId) {
+        match.setResult(teamId, clubMemberMvpId);
+        matchRepository.save(match);
     }
 
     /**
@@ -245,6 +251,49 @@ class TeamControllerTest extends IntegrationTestBase {
                             .content(toJson(request)))
                     .andExpect(status().isNotFound());
         }
+
+        @Test
+        @DisplayName("deve retornar 400 quando tentam alterar camisa de time com resultado definido")
+        void updateJerseyBlockedAfterResult() throws Exception {
+            TestContext ctx = setupDirectorContext("jersey_result");
+            Team team = persistTeam(ctx.match().getId(), null);
+            ClubMember player = createClubMember(null, ctx.club().getId(), ClubRole.MEMBER);
+            markMatchResult(ctx.match(), team.getId(), player.getId());
+            ClubJersey newJersey = createJersey(ctx.club().getId(), "Camisa Bloqueada", "#0000FF");
+
+            var request = new UpdateTeamJerseyRequestDTO(newJersey.getId());
+
+            mockMvc.perform(patch("/api/teams/{id}/jersey", team.getId())
+                            .header("Authorization", bearerToken(ctx.director()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(request)))
+                    .andExpect(status().isBadRequest());
+        }
+    }
+
+    // ── PUT /api/teams/{id} ──────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("PUT /api/teams/{id}")
+    class UpdateTeam {
+
+        @Test
+        @DisplayName("deve retornar 400 quando tentam atualizar time com resultado definido")
+        void updateBlockedAfterResult() throws Exception {
+            TestContext ctx = setupDirectorContext("update_result");
+            Team team = persistTeam(ctx.match().getId(), null);
+            ClubMember player = createClubMember(null, ctx.club().getId(), ClubRole.MEMBER);
+            ClubJersey newJersey = createJersey(ctx.club().getId(), "Camisa Update Bloqueado", "#0000FF");
+            markMatchResult(ctx.match(), team.getId(), player.getId());
+
+            var request = new UpdateTeamRequestDTO(newJersey.getId());
+
+            mockMvc.perform(put("/api/teams/{id}", team.getId())
+                            .header("Authorization", bearerToken(ctx.director()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(request)))
+                    .andExpect(status().isBadRequest());
+        }
     }
 
     // ── POST /api/teams/generate ──────────────────────────────────────────────
@@ -338,6 +387,29 @@ class TeamControllerTest extends IntegrationTestBase {
                     ctx.match().getId(),
                     List.of(memberId, memberId2),
                     List.of(memberId), // overlap!
+                    3
+            );
+
+            mockMvc.perform(post("/api/teams/generate")
+                            .header("Authorization", bearerToken(ctx.director()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(request)))
+                    .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("deve retornar 400 quando tentam gerar times de partida com resultado definido")
+        void generateBlockedAfterResult() throws Exception {
+            TestContext ctx = setupDirectorContext("gen_result");
+            Team team = persistTeam(ctx.match().getId(), null);
+            ClubMember player1 = createClubMember(null, ctx.club().getId(), ClubRole.MEMBER);
+            ClubMember player2 = createClubMember(null, ctx.club().getId(), ClubRole.MEMBER);
+            markMatchResult(ctx.match(), team.getId(), player1.getId());
+
+            var request = new GenerateTeamsRequestDTO(
+                    ctx.match().getId(),
+                    List.of(player1.getId(), player2.getId()),
+                    List.of(),
                     3
             );
 
@@ -459,6 +531,30 @@ class TeamControllerTest extends IntegrationTestBase {
                             .content(toJson(request)))
                     .andExpect(status().isForbidden());
         }
+
+        @Test
+        @DisplayName("deve retornar 400 quando tentam trocar jogadores de partida com resultado definido")
+        void swapBlockedAfterResult() throws Exception {
+            TestContext ctx = setupDirectorContext("swap_result");
+            ClubMember m1 = createClubMember(null, ctx.club().getId(), ClubRole.MEMBER);
+            ClubMember m2 = createClubMember(null, ctx.club().getId(), ClubRole.MEMBER);
+            Team team1 = persistTeam(ctx.match().getId(), null);
+            Team team2 = persistTeam(ctx.match().getId(), null);
+            matchParticipantRepository.save(MatchParticipant.create(ctx.match().getId(), m1.getId(), MatchParticipantPosition.LINE, team1.getId()));
+            matchParticipantRepository.save(MatchParticipant.create(ctx.match().getId(), m2.getId(), MatchParticipantPosition.LINE, team2.getId()));
+            markMatchResult(ctx.match(), team1.getId(), m1.getId());
+
+            var request = new SwapPlayersRequestDTO(
+                    ctx.match().getId(),
+                    List.of(new PlayerSwapDTO(m1.getId(), m2.getId()))
+            );
+
+            mockMvc.perform(post("/api/teams/swap")
+                            .header("Authorization", bearerToken(ctx.director()))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(request)))
+                    .andExpect(status().isBadRequest());
+        }
     }
 
     // ── DELETE /api/teams/{id} ────────────────────────────────────────────────
@@ -503,6 +599,20 @@ class TeamControllerTest extends IntegrationTestBase {
                             .header("Authorization", bearerToken(member)))
                     .andExpect(status().isForbidden());
         }
+
+        @Test
+        @DisplayName("deve retornar 400 quando tentam deletar time de partida com resultado definido")
+        void deleteBlockedAfterResult() throws Exception {
+            TestContext ctx = setupDirectorContext("delete_result");
+            Team team = persistTeam(ctx.match().getId(), null);
+            ClubMember player = createClubMember(null, ctx.club().getId(), ClubRole.MEMBER);
+            markMatchResult(ctx.match(), team.getId(), player.getId());
+
+            mockMvc.perform(delete("/api/teams/{id}", team.getId())
+                            .header("Authorization", bearerToken(ctx.director())))
+                    .andExpect(status().isBadRequest());
+
+            org.junit.jupiter.api.Assertions.assertTrue(teamRepository.existsById(team.getId()));
+        }
     }
 }
-

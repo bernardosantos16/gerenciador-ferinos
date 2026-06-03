@@ -103,6 +103,7 @@ public class TeamService {
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "team not found"));
         Match match = requireMatch(team.getMatchId());
         clubAuthorizationService.requireDirector(match.getClubId());
+        ensureMatchResultNotSet(match);
         validateJersey(match.getClubId(), request.clubJerseyId());
         team.changeJersey(request.clubJerseyId());
         return toResponse(team);
@@ -114,6 +115,7 @@ public class TeamService {
 
         Match match = requireMatch(team.getMatchId());
         clubAuthorizationService.requireDirector(match.getClubId());
+        ensureMatchResultNotSet(match);
         validateJersey(match.getClubId(), request.clubJerseyId());
         team.changeJersey(request.clubJerseyId());
 

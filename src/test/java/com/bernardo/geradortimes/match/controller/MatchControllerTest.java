@@ -327,8 +327,8 @@ class MatchControllerTest extends IntegrationTestBase {
         }
 
         @Test
-        @DisplayName("deve ser idempotente quando o mesmo resultado é enviado novamente")
-        void setResultIdempotent() throws Exception {
+        @DisplayName("deve retornar 400 quando tentam definir o resultado novamente")
+        void setResultAlreadySet() throws Exception {
             User director = createActiveUser("director_idempotent@match.com", "director_idempotent");
             Club club = createClub("Clube Idempotente", "clube_idempotente");
             createClubMember(director.getId(), club.getId(), ClubRole.DIRECTOR);
@@ -353,7 +353,7 @@ class MatchControllerTest extends IntegrationTestBase {
                             .header("Authorization", bearerToken(director))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(toJson(request)))
-                    .andExpect(status().isOk());
+                    .andExpect(status().isBadRequest());
 
             ClubMember updatedPlayer = clubMemberRepository.findById(player.getId()).orElseThrow();
             assertEquals(1, updatedPlayer.getTimesChampion());
@@ -361,8 +361,8 @@ class MatchControllerTest extends IntegrationTestBase {
         }
 
         @Test
-        @DisplayName("deve compensar estatisticas ao trocar campeao e MVP")
-        void setResultChangeCompensatesPreviousStats() throws Exception {
+        @DisplayName("deve retornar 400 ao tentar trocar campeao e MVP ja definidos")
+        void setResultChangeBlocked() throws Exception {
             User director = createActiveUser("director_change_result@match.com", "director_change_result");
             Club club = createClub("Clube Troca Resultado", "clube_troca_resultado");
             createClubMember(director.getId(), club.getId(), ClubRole.DIRECTOR);
@@ -388,18 +388,18 @@ class MatchControllerTest extends IntegrationTestBase {
                             .header("Authorization", bearerToken(director))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(toJson(new SetMatchResultRequestDTO(team2.getId(), player3.getId()))))
-                    .andExpect(status().isOk());
+                    .andExpect(status().isBadRequest());
 
             ClubMember updatedPlayer1 = clubMemberRepository.findById(player1.getId()).orElseThrow();
             ClubMember updatedPlayer2 = clubMemberRepository.findById(player2.getId()).orElseThrow();
             ClubMember updatedPlayer3 = clubMemberRepository.findById(player3.getId()).orElseThrow();
             ClubMember updatedPlayer4 = clubMemberRepository.findById(player4.getId()).orElseThrow();
-            assertEquals(0, updatedPlayer1.getTimesChampion());
-            assertEquals(0, updatedPlayer2.getTimesChampion());
-            assertEquals(0, updatedPlayer2.getTimesMvp());
-            assertEquals(1, updatedPlayer3.getTimesChampion());
-            assertEquals(1, updatedPlayer3.getTimesMvp());
-            assertEquals(1, updatedPlayer4.getTimesChampion());
+            assertEquals(1, updatedPlayer1.getTimesChampion());
+            assertEquals(1, updatedPlayer2.getTimesChampion());
+            assertEquals(1, updatedPlayer2.getTimesMvp());
+            assertEquals(0, updatedPlayer3.getTimesChampion());
+            assertEquals(0, updatedPlayer3.getTimesMvp());
+            assertEquals(0, updatedPlayer4.getTimesChampion());
         }
 
         @Test
@@ -506,6 +506,30 @@ class MatchControllerTest extends IntegrationTestBase {
                     .andExpect(status().isNoContent());
 
             org.junit.jupiter.api.Assertions.assertFalse(matchRepository.existsById(match.getId()));
+        }
+
+        @Test
+        @DisplayName("deve retornar 400 quando tentam deletar partida com resultado definido")
+        void deleteBlockedAfterResult() throws Exception {
+            User director = createActiveUser("director_delete_result@match.com", "director_delete_result");
+            Club club = createClub("Clube Delete Resultado", "clube_delete_resultado");
+            createClubMember(director.getId(), club.getId(), ClubRole.DIRECTOR);
+            ClubMember player = createClubMember(null, club.getId(), ClubRole.MEMBER);
+            Match match = persistPastMatch(club.getId());
+            Team team = persistTeam(match.getId());
+            matchParticipantRepository.save(MatchParticipant.create(match.getId(), player.getId(), MatchParticipantPosition.LINE, team.getId()));
+
+            mockMvc.perform(patch("/api/matches/{id}/result", match.getId())
+                            .header("Authorization", bearerToken(director))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(new SetMatchResultRequestDTO(team.getId(), player.getId()))))
+                    .andExpect(status().isOk());
+
+            mockMvc.perform(delete("/api/matches/{id}", match.getId())
+                            .header("Authorization", bearerToken(director)))
+                    .andExpect(status().isBadRequest());
+
+            org.junit.jupiter.api.Assertions.assertTrue(matchRepository.existsById(match.getId()));
         }
 
         @Test

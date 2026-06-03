@@ -25,6 +25,22 @@ public record UpdateClubMemberRequestDTO(
         Integer rating,
 
         @Schema(
+                description = "Novo número de vezes em que o membro foi campeão.",
+                example = "10",
+                minimum = "0"
+        )
+        @Min(0)
+        Integer timesChampion,
+
+        @Schema(
+                description = "Novo número de vezes em que o membro foi MVP.",
+                example = "5",
+                minimum = "0"
+        )
+        @Min(0)
+        Integer timesMvp,
+
+        @Schema(
                 description = "Nova role do membro no clube.",
                 example = "DIRECTOR"
         )

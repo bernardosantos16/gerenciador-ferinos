@@ -91,6 +91,14 @@ public class ClubMember {
         this.rating = rating;
     }
 
+    public void changeTimesMvp(Integer timesMvp) {
+        this.timesMvp = timesMvp;
+    }
+
+    public void changeTimesChampion(Integer timesChampion) {
+        this.timesChampion = timesChampion;
+    }
+
     public void changeRole(ClubRole role) {
         this.clubRole = role;
     }
