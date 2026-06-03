@@ -23,34 +23,22 @@ API REST para gerenciar usuarios, clubes, partidas e gerar times balanceados par
 - PostgreSQL
 
 ## Configuracao
-As variaveis abaixo sao lidas de variaveis de ambiente (ou `.env` quando suportado pela sua execucao local).
+Os ambientes ficam separados por perfil Spring:
+- `dev` para desenvolvimento local
+- `test` para testes automatizados
+- `prod` para producao
 
-Obrigatorias:
-- `JDBC_URL`
-- `POSTGRES_USER`
-- `POSTGRES_PASSWORD`
-- `ARGON_PEPPER`
-- `AUTH_COOKIE_REFRESH_NAME`
-- `AUTH_COOKIE_PATH`
-- `AUTH_COOKIE_SECURE`
-- `AUTH_COOKIE_SAMESITE`
+Ativacao:
+- Desenvolvimento: `SPRING_PROFILES_ACTIVE=dev`
+- Testes: `SPRING_PROFILES_ACTIVE=test`
+- Producao: `SPRING_PROFILES_ACTIVE=prod`
 
-Recomendadas (com default em `application.properties`):
-- `JWT_SECRET` (default: `dev-secret-change-me`)
-- `JWT_ISSUER` (default: `geradortimes`)
-- `JWT_ACCESS_TTL` (default: `15m`)
-- `JWT_REFRESH_TTL` (default: `30d`)
-- `JWT_REFRESH_SALT` (default: `dev-refresh-salt-change-me`)
-
-### Supabase
-Para usar Supabase, configure as variaveis abaixo (elas tem prioridade sobre `JDBC_URL/POSTGRES_*`):
-- `SUPABASE_JDBC_URL` (ex.: `jdbc:postgresql://db.<project-ref>.supabase.co:5432/postgres?sslmode=require`)
-- `SUPABASE_DB_USER` (normalmente `postgres`)
-- `SUPABASE_DB_PASSWORD`
+O perfil `dev` aceita defaults locais para facilitar execucao fora do ambiente final.
+O perfil `prod` exige variaveis de ambiente.
 
 ## Rodando localmente
 ```bash
-./mvnw spring-boot:run
+SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run
 ```
 
 Swagger UI:
@@ -58,8 +46,21 @@ Swagger UI:
 
 ## Testes
 ```bash
-./mvnw test
+SPRING_PROFILES_ACTIVE=test ./mvnw test
 ```
+
+## Docker
+Build da imagem:
+```bash
+docker build -t geradortimes-api .
+```
+
+Execucao usando variaveis de ambiente:
+```bash
+docker run --env-file .env -p 8080:8080 geradortimes-api
+```
+
+Use `.env.example` como referencia para montar o `.env` de deploy. A imagem roda por padrao com `SPRING_PROFILES_ACTIVE=prod`.
 
 ## Visao geral da API
 Prefixo base: `/api`

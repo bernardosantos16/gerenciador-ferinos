@@ -22,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -43,6 +44,7 @@ import java.util.UUID;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
+@ActiveProfiles("test")
 public abstract class IntegrationTestBase {
 
     @SuppressWarnings("resource")
@@ -62,7 +64,7 @@ public abstract class IntegrationTestBase {
         registry.add("spring.datasource.driver-class-name", POSTGRESQL::getDriverClassName);
     }
 
-    // ── JWT constants (must match test application.properties) ──────────────
+    // ── JWT constants (must match test profile) ─────────────────────────────
     protected static final String JWT_SECRET  = "dev-test-secret-key-must-be-at-least-32-chars-long";
     protected static final String JWT_ISSUER  = "geradortimes-test";
     protected static final long   JWT_TTL_SEC = 900L; // 15 min
