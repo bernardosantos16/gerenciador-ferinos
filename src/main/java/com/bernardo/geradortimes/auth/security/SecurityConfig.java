@@ -26,7 +26,7 @@ import java.util.List;
 public class SecurityConfig {
 
     @Value("${railway.domain}")
-    private static String railwayDomain;
+    private String railwayDomain;
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
