@@ -1,0 +1,9 @@
+target
+.idea
+.vscode
+.git
+.github
+*.iml
+.env
+Dockerfile
+README.md

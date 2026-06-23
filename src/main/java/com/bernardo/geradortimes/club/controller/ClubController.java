@@ -70,6 +70,23 @@ public class ClubController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("nickname/{nickname}")
+    @Operation(summary = "Buscar clube por ID")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Clube encontrado.",
+                    content = @Content(schema = @Schema(implementation = ClubResponseDTO.class))),
+            @ApiResponse(responseCode = "401", description = "Nao autenticado."),
+            @ApiResponse(responseCode = "404", description = "Clube nao encontrado.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    public ResponseEntity<ClubResponseDTO> getClubByNickName(
+            @Parameter(description = "nickname do clube.", required = true, example = "club_fc")
+            @PathVariable String nickname
+    ){
+        var response = clubService.getClubByNickname(nickname);
+        return ResponseEntity.ok(response);
+    }
+
     @GetMapping
     @Operation(summary = "Listar clubes do usuario por funcao",
             description = "Lista os clubes do usuario autenticado, filtrando por funcao (MEMBER, DIRECTOR)."

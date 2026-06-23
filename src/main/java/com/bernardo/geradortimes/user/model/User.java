@@ -9,6 +9,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import org.hibernate.annotations.UuidGenerator;
 
+import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -44,6 +45,8 @@ public class User {
     @Column(name = "email_verification_token", unique = true)
     private String emailVerificationToken;
 
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
     protected User() {
     }
 
@@ -78,7 +81,8 @@ public class User {
     }
 
     public String generateEmailVerificationToken() {
-        this.emailVerificationToken = UUID.randomUUID().toString();
+        var token = 100000 + SECURE_RANDOM.nextInt(900000);
+        this.emailVerificationToken = String.valueOf(token);
         return this.emailVerificationToken;
     }
 

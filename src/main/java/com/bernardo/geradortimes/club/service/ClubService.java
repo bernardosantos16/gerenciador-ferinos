@@ -80,6 +80,13 @@ public class ClubService {
         return new ClubResponseDTO(club.getId(), club.getName(), club.getNickname().getValue());
     }
 
+    public ClubResponseDTO getClubByNickname(String nickname) {
+        Club club = clubRepository.findByNicknameValue(nickname)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "club not found"));
+
+        return new ClubResponseDTO(club.getId(), club.getName(), club.getNickname().getValue());
+    }
+
     @Transactional
     public ClubResponseDTO update(UUID clubId, UpdateClubRequestDTO request) {
         Club club = clubRepository.findById(clubId)

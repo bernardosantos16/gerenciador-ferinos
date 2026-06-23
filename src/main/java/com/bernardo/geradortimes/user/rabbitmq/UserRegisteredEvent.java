@@ -4,7 +4,7 @@ import java.util.UUID;
 
 public record UserRegisteredEvent(
         UUID userId,
-        String name,
+        String nickname,
         String email,
         String verificationToken
 ) {

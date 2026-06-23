@@ -96,7 +96,7 @@
 		<!-- Source: https://mvnrepository.com/artifact/org.springframework.security/spring-security-crypto -->
 		<dependency>
 			<groupId>de.mkammerer</groupId>
-			<artifactId>argon2-jvm-nolibs</artifactId>
+			<artifactId>argon2-jvm</artifactId>
 			<version>2.12</version>
 		</dependency>
 

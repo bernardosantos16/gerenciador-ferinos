@@ -66,7 +66,7 @@ public class UserService {
         String verificationToken = user.generateEmailVerificationToken();
         User saved = userRepository.save(user);
 
-        userRegisteredProducer.publish(new UserRegisteredEvent(saved.getId(), saved.getName(), email.getValue(), verificationToken));
+        userRegisteredProducer.publish(new UserRegisteredEvent(saved.getId(), nickname.getValue(), email.getValue(), verificationToken));
 
         return toResponse(saved);
     }
