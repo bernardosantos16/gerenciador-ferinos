@@ -5,13 +5,15 @@
 A suíte atual é focada em **testes de integração de controllers**.  
 Os testes sobem o contexto completo do Spring Boot, executam requisições HTTP com `MockMvc` e validam resposta + persistência em banco.
 
-Atualmente existem **90 testes** distribuídos em:
+Atualmente existem **149 testes** distribuídos em:
 
 - `AuthControllerTest` (11)
 - `ClubControllerTest` (27)
-- `UserControllerTest` (16)
-- `MatchControllerTest` (15)
-- `TeamControllerTest` (21)
+- `ClubMemberControllerTest` (18)
+- `ClubJerseyControllerTest` (15)
+- `UserControllerTest` (29)
+- `MatchControllerTest` (23)
+- `TeamControllerTest` (26)
 
 ## Tecnologias de teste usadas
 

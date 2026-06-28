@@ -9,7 +9,6 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import org.hibernate.annotations.UuidGenerator;
 
-import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -42,11 +41,6 @@ public class User {
     @Enumerated(EnumType.STRING)
     private UserRole role;
 
-    @Column(name = "email_verification_token", unique = true)
-    private String emailVerificationToken;
-
-    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
-
     protected User() {
     }
 
@@ -77,22 +71,11 @@ public class User {
     }
 
     public void inactivateUser() {
-        this.status = ActivityStatus.INACTIVE;
+        this.status = ActivityStatus.DISABLED;
     }
 
-    public String generateEmailVerificationToken() {
-        var token = 100000 + SECURE_RANDOM.nextInt(900000);
-        this.emailVerificationToken = String.valueOf(token);
-        return this.emailVerificationToken;
-    }
-
-    public boolean verifyEmail(String token) {
-        if (this.emailVerificationToken != null && this.emailVerificationToken.equals(token)) {
-            this.emailVerificationToken = null;
-            this.status = ActivityStatus.ACTIVE;
-            return true;
-        }
-        return false;
+    public void updatePassword(PasswordHash newPassword) {
+        this.password = newPassword;
     }
 
 }

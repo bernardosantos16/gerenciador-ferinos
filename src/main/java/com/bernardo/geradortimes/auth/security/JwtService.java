@@ -46,6 +46,7 @@ public class JwtService {
                 .withClaim("login", user.getLogin().getValue())
                 .withClaim("nickname", user.getNickname().getValue())
                 .withClaim("role", user.getRole().name())
+                .withClaim("status", user.getStatus().name())
                 .sign(algorithm);
     }
 

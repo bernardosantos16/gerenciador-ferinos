@@ -4,13 +4,12 @@ import com.bernardo.geradortimes.shared.enums.TokenType;
 
 import java.util.UUID;
 
-public record UserRegisteredEvent(
+public record PasswordResetEvent(
         UUID userId,
-        String nickname,
         String email,
-        String verificationToken
+        String token
 ) {
     public TokenType tokenType() {
-        return TokenType.ACCOUNT_VERIFICATION;
+        return TokenType.PASSWORD_RESET;
     }
 }

@@ -45,16 +45,17 @@ public class AuthService {
         User user = userRepository.findByLogin_Value(request.login().trim())
                 .orElseThrow(() -> new ResponseStatusException(UNAUTHORIZED, "invalid credentials"));
 
-        if (user.getStatus() == ActivityStatus.INACTIVE) {
-            log.error("Usuario inativo tentou autenticar - userId: {}", user.getId());
+        boolean ok = passwordService.matches(request.password(), user.getPassword().getValue());
+        if (!ok) {
             throw new ResponseStatusException(UNAUTHORIZED, "invalid credentials");
         }
 
-        boolean ok = passwordService.matches(request.password(), user.getPassword().getValue());
-        if (!ok) {
-            log.error("Senha incorreta para usuario - userId: {}", user.getId());
-            throw new ResponseStatusException(UNAUTHORIZED, "invalid credentials");
+        ActivityStatus status = user.getStatus();
+        if (status.isInvalid()) {
+            log.error("Usuário com status {} tentou autenticar - userId: {}", status, user.getId());
+            throw new ResponseStatusException(UNAUTHORIZED, status.getErrorMessage());
         }
+
 
         String accessToken = jwtService.issueAccessToken(user);
         String refreshToken = refreshTokenService.issue(user.getId());
@@ -77,8 +78,8 @@ public class AuthService {
         User user = userRepository.findById(current.getUserId())
                 .orElseThrow(() -> new ResponseStatusException(UNAUTHORIZED, "invalid refresh token - user not found"));
 
-        if (user.getStatus() == ActivityStatus.INACTIVE) {
-            throw new ResponseStatusException(UNAUTHORIZED, "invalid refresh token - user inactive");
+        if (user.getStatus() != ActivityStatus.ACTIVE) {
+            throw new ResponseStatusException(UNAUTHORIZED, "invalid refresh token - user not active");
         }
 
         String accessToken = jwtService.issueAccessToken(user);

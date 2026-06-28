@@ -79,7 +79,11 @@ Usuarios:
 Clubes:
 - `POST /api/clubs`
 - `GET /api/clubs/{id}`
+
 - `POST /api/clubs/{clubId}/members`
+- `GET /api/clubs/{clubId}/members`
+- `GET /api/clubs/{clubId}/members/{memberId}`
+
 - `POST /api/clubs/{clubId}/jerseys`
 - `GET /api/clubs/{clubId}/jerseys`
 - `DELETE /api/clubs/{clubId}/jerseys/{jerseyId}`

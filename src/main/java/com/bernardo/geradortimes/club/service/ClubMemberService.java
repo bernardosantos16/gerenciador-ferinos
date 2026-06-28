@@ -8,13 +8,11 @@ import com.bernardo.geradortimes.club.repository.ClubMemberRepository;
 import com.bernardo.geradortimes.shared.enums.ClubRole;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.List;
 import java.util.UUID;
 
 import static org.springframework.http.HttpStatus.NOT_FOUND;
@@ -50,7 +48,7 @@ public class ClubMemberService {
     }
 
 
-    public void addNonUserClubMember(UUID clubId, AddClubMemberRequestDTO requestDTO) {
+    public ClubMemberResponseDTO addNonUserClubMember(UUID clubId, AddClubMemberRequestDTO requestDTO) {
         clubAuthorizationService.requireDirector(clubId);
         ClubMember clubMember = ClubMember.create(
                 null,
@@ -63,9 +61,10 @@ public class ClubMemberService {
                 ClubRole.MEMBER
         );
         clubMemberRepository.save(clubMember);
+        return toResponse(clubMember);
     }
 
-    public Page<ClubMemberResponseDTO> listMembers(UUID clubId, Pageable pageable) {
+    public Page<ClubMemberResponseDTO> paginateMembers(UUID clubId, Pageable pageable) {
         clubAuthorizationService.requireMember(clubId);
         Page<ClubMember> members = clubMemberRepository.findByClubId(clubId, pageable);
         return members
@@ -81,22 +80,13 @@ public class ClubMemberService {
                 ));
     }
 
-    public List<ClubMemberResponseDTO> getAllMembers(UUID clubId) {
-        clubAuthorizationService.requireMember(clubId);
-        Page<ClubMember> members = clubMemberRepository.findByClubId(clubId, PageRequest.of(0, Integer.MAX_VALUE));
-        return members.getContent()
-                .stream()
-                .map(member -> new ClubMemberResponseDTO(
-                        member.getId(),
-                        member.getUserId(),
-                        member.getName(),
-                        member.getRating(),
-                        member.getTimesMvp(),
-                        member.getTimesChampion(),
-                        member.getTeamId(),
-                        member.getClubRole()
-                ))
-                .toList();
+    @Transactional
+    public ClubMemberResponseDTO getMember(UUID clubId, Long memberId) {
+        clubAuthorizationService.requireDirector(clubId);
+        ClubMember member = clubMemberRepository.findById(memberId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "member not found"));
+
+        return toResponse(member);
     }
 
     @Transactional

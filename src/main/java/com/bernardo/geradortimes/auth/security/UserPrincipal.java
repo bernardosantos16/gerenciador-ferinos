@@ -1,5 +1,6 @@
 package com.bernardo.geradortimes.auth.security;
 
+import com.bernardo.geradortimes.shared.enums.ActivityStatus;
 import com.bernardo.geradortimes.shared.enums.UserRole;
 import org.jspecify.annotations.NonNull;
 import org.springframework.security.core.GrantedAuthority;
@@ -13,7 +14,8 @@ import java.util.UUID;
 public record UserPrincipal(
         @NonNull UUID id,
         @NonNull String username,
-        @NonNull UserRole role
+        @NonNull UserRole role,
+        @NonNull ActivityStatus status
 ) implements UserDetails {
 
     @Override

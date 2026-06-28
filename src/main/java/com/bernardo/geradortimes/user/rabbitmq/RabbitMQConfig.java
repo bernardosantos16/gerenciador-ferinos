@@ -19,14 +19,20 @@ public class RabbitMQConfig {
     private String exchange;
 
     @Value("${app.rabbitmq.queue:user.email.confirmation.queue}")
-    private String queue;
+    private String confirmationQueue;
 
     @Value("${app.rabbitmq.routing-key:user.registered}")
-    private String routingKey;
+    private String confirmationRoutingKey;
+
+    @Value("${app.rabbitmq.password-reset.queue:user.email.password-reset.queue}")
+    private String passwordResetQueue;
+
+    @Value("${app.rabbitmq.password-reset.routing-key:user.password-reset}")
+    private String passwordResetRoutingKey;
 
     @Bean
     public JacksonJsonMessageConverter jsonMessageConverter() {
-        return new JacksonJsonMessageConverter(); // Spring AMQP 4.x
+        return new JacksonJsonMessageConverter();
     }
 
     @Bean
@@ -44,12 +50,21 @@ public class RabbitMQConfig {
 
     @Bean
     public Queue userEmailConfirmationQueue() {
-        return new Queue(queue, true);
+        return new Queue(confirmationQueue, true);
     }
 
     @Bean
-    public Binding binding(Queue userEmailConfirmationQueue, TopicExchange userExchange) {
-        return BindingBuilder.bind(userEmailConfirmationQueue).to(userExchange).with(routingKey);
+    public Binding confirmationBinding(Queue userEmailConfirmationQueue, TopicExchange userExchange) {
+        return BindingBuilder.bind(userEmailConfirmationQueue).to(userExchange).with(confirmationRoutingKey);
+    }
+
+    @Bean
+    public Queue userEmailPasswordResetQueue() {
+        return new Queue(passwordResetQueue, true);
+    }
+
+    @Bean
+    public Binding passwordResetBinding(Queue userEmailPasswordResetQueue, TopicExchange userExchange) {
+        return BindingBuilder.bind(userEmailPasswordResetQueue).to(userExchange).with(passwordResetRoutingKey);
     }
 }
-

@@ -15,7 +15,10 @@ import com.bernardo.geradortimes.shared.value_object.HexColor;
 import com.bernardo.geradortimes.shared.value_object.Nickname;
 import com.bernardo.geradortimes.shared.value_object.PasswordHash;
 import com.bernardo.geradortimes.user.model.User;
+import com.bernardo.geradortimes.shared.enums.TokenType;
+import com.bernardo.geradortimes.user.model.VerificationToken;
 import com.bernardo.geradortimes.user.repository.UserRepository;
+import com.bernardo.geradortimes.user.repository.VerificationTokenRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,8 +34,13 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import tools.jackson.databind.ObjectMapper;
 
 import java.lang.reflect.Field;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Date;
+import java.util.HexFormat;
 import java.util.UUID;
 
 /**
@@ -96,12 +104,16 @@ public abstract class IntegrationTestBase {
     @Autowired
     protected ClubJerseyRepository clubJerseyRepository;
 
+    @Autowired
+    protected VerificationTokenRepository verificationTokenRepository;
+
     // ── Cleanup ───────────────────────────────────────────────────────────────
     @BeforeEach
     void cleanDatabase() {
         clubMemberRepository.deleteAll();
         clubJerseyRepository.deleteAll();
         clubRepository.deleteAll();
+        verificationTokenRepository.deleteAll();
         userRepository.deleteAll();
     }
 
@@ -190,6 +202,48 @@ public abstract class IntegrationTestBase {
     protected ClubJersey createJersey(UUID clubId, String name, String hexColor) {
         ClubJersey jersey = ClubJersey.create(HexColor.of(hexColor), name, false, clubId);
         return clubJerseyRepository.save(jersey);
+    }
+
+    /**
+     * Generates a 6-digit verification token, hashes it (SHA-256), persists a
+     * {@link VerificationToken} of type {@link TokenType#ACCOUNT_VERIFICATION}
+     * with a 15-minute expiry for the given user, and returns the plain token.
+     */
+    protected String createVerificationToken(User user) {
+        return createToken(user, TokenType.ACCOUNT_VERIFICATION);
+    }
+
+    /**
+     * Generates a 6-digit password reset token, hashes it (SHA-256), persists a
+     * {@link VerificationToken} of type {@link TokenType#PASSWORD_RESET}
+     * with a 15-minute expiry for the given user, and returns the plain token.
+     */
+    protected String createPasswordResetToken(User user) {
+        return createToken(user, TokenType.PASSWORD_RESET);
+    }
+
+    private String createToken(User user, TokenType type) {
+        int raw = 100000 + new java.security.SecureRandom().nextInt(900000);
+        String token = String.valueOf(raw);
+        String hash = sha256(token);
+        VerificationToken vt = VerificationToken.create(
+                hash,
+                type,
+                Instant.now().plus(15, ChronoUnit.MINUTES),
+                user.getId()
+        );
+        verificationTokenRepository.save(vt);
+        return token;
+    }
+
+    protected static String sha256(String input) {
+        try {
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**

@@ -50,7 +50,7 @@ public class Club {
     }
 
     public void deactivate() {
-        this.status = ActivityStatus.INACTIVE;
+        this.status = ActivityStatus.DISABLED;
     }
 
     public void changeName(String name) {

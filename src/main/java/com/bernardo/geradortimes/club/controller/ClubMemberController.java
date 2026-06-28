@@ -4,6 +4,7 @@ package com.bernardo.geradortimes.club.controller;
 import com.bernardo.geradortimes.club.dto.request.AddClubMemberRequestDTO;
 import com.bernardo.geradortimes.club.dto.request.UpdateClubMemberRequestDTO;
 import com.bernardo.geradortimes.club.dto.response.ClubMemberResponseDTO;
+import com.bernardo.geradortimes.club.model.ClubMember;
 import com.bernardo.geradortimes.club.service.ClubMemberService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -50,15 +51,36 @@ public class ClubMemberController {
             @ApiResponse(responseCode = "403", description = "Usuario nao possui permissao (DIRECTOR requerido).",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
-    public ResponseEntity<Void> add(
+    public ResponseEntity<ClubMemberResponseDTO> add(
             @Parameter(description = "ID do clube.", required = true, example = "c0a8012e-6f1f-4b4b-9f5e-7a8b9c0d1e2f")
             @PathVariable UUID clubId,
             @Valid @RequestBody AddClubMemberRequestDTO request
     ) {
-        clubMemberService.addNonUserClubMember(clubId, request);
+        var newMember = clubMemberService.addNonUserClubMember(clubId, request);
         return ResponseEntity
-                .created(URI.create("/api/clubs/" + clubId + "/members"))
-                .build();
+                .created(URI.create("/api/clubs/" + clubId + "/members/" + newMember.id()))
+                .body(newMember);
+    }
+
+    @GetMapping("/{memberId}")
+    @Operation(summary = "Buscar membro do clube por ID")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Membro atualizado.",
+                    content = @Content(schema = @Schema(implementation = ClubMemberResponseDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Requisicao invalida (validacao).",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "401", description = "Nao autenticado."),
+            @ApiResponse(responseCode = "404", description = "Membro nao encontrado.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    public ResponseEntity<ClubMemberResponseDTO> getMember(
+            @Parameter(description = "ID do clube.", required = true, example = "c0a8012e-6f1f-4b4b-9f5e-7a8b9c0d1e2f")
+            @PathVariable UUID clubId,
+            @Parameter(description = "ID do membro.", required = true, example = "1")
+            @PathVariable Long memberId
+    ) {
+
+        return ResponseEntity.ok(clubMemberService.getMember(clubId, memberId));
     }
 
     @GetMapping
@@ -75,7 +97,7 @@ public class ClubMemberController {
             @PathVariable UUID clubId,
             @ParameterObject @PageableDefault(sort = "name") Pageable pageable
     ) {
-        Page<ClubMemberResponseDTO> members = clubMemberService.listMembers(clubId, pageable);
+        Page<ClubMemberResponseDTO> members = clubMemberService.paginateMembers(clubId, pageable);
         return ResponseEntity.ok(members);
     }
 
