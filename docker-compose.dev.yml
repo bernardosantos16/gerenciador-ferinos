@@ -40,4 +40,4 @@ volumes:
 
 networks:
   default:
-    name: task_flows_default
+    name: gerador_times_default
