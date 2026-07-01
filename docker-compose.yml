@@ -1,5 +1,4 @@
 services:
-
   postgres:
     image: postgres:18
     container_name: gerador-times-postgres
@@ -9,6 +8,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5433:5432"
+    restart: unless-stopped
     volumes:
       - postgres_data:/var/lib/postgresql
     healthcheck:
@@ -17,17 +17,5 @@ services:
       timeout: 5s
       retries: 10
 
-  app:
-    build: .
-    container_name: gerador-times-api
-    env_file:
-      - .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-    ports:
-      - "8080:8080"
-    environment:
-      SPRING_PROFILES_ACTIVE: prod
 volumes:
   postgres_data:

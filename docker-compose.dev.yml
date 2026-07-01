@@ -1,0 +1,43 @@
+services:
+  app:
+    image: ${DOCKER_USERNAME}/${APP_NAME}:latest
+    container_name: ${APP_NAME}
+    restart: unless-stopped
+    environment:
+      - DB_URL=postgres-sql-spring-app
+      - DB_PORT=5432
+      - DB_NAME=${PG_DB_DB_NAME}
+      - DB_USERNAME=${PG_DB_USERNAME}
+      - DB_PASSWORD=${PG_DB_PASSWORD}
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+
+  postgres:
+    image: postgres:18
+    container_name: gerador-times-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    # Não expõe a porta para o host/internet — só fica acessível
+    # para outros containers na mesma rede do compose.
+    expose:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+
+volumes:
+  postgres_data:
+
+networks:
+  default:
+    name: task_flows_default

@@ -1,34 +1,43 @@
 # ==========================================
-# Estágio 1: Build (Compilação)
+# Estágio 1: Build
 # ==========================================
 FROM eclipse-temurin:21-jdk-alpine AS builder
 WORKDIR /app
 
 # Copia apenas os arquivos de configuração do Maven primeiro (cache layer)
+# Assim, o Docker só reexecuta o download de dependências quando o pom.xml mudar
 COPY .mvn/ .mvn/
 COPY mvnw pom.xml ./
-# Baixa as dependências offline para acelerar builds futuros
-RUN ./mvnw dependency:go-offline
+RUN chmod +x ./mvnw
+RUN ./mvnw dependency:go-offline -B
 
-# Copia o código-fonte e compila (executando os testes)
+# Copia o código-fonte e compila
+# Testes ficam fora do build da imagem (rodam em job separado no GitHub Actions);
+# aqui usamos -DskipTests para manter o build da imagem rápido e determinístico
 COPY src ./src
-RUN ./mvnw clean package
+RUN ./mvnw clean package -DskipTests -B
 
 # ==========================================
-# Estágio 2: Produção (Imagem final leve)
+# Estágio 2: Produção (imagem final leve)
 # ==========================================
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
-# Cria um usuário não-root por segurança (Boa prática para Nuvem/VPS)
+# Usuário não-root por segurança
 RUN addgroup -S spring && adduser -S spring -G spring
-USER spring:spring
 
-# Copia o .jar gerado no estágio anterior
+# Copia o jar pelo nome fixo, independente de versão/artifactId
 COPY --from=builder /app/target/*.jar app.jar
 
-# Expõe a porta padrão da aplicação
+# Ajusta o dono dos arquivos para o usuário não-root antes de trocar de usuário
+RUN chown spring:spring app.jar
+USER spring:spring
+
 EXPOSE 8080
 
-# Executa a aplicação com o perfil de produção
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+# Permite tunar memória/JVM via env var sem rebuild da imagem
+ENV JAVA_OPTS=""
+
+# Profile e demais configs (DB_URL, JWT secrets etc.) entram via
+# variáveis de ambiente no docker-compose/docker run, nunca hardcoded na imagem
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]
