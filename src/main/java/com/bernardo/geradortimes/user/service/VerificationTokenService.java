@@ -4,7 +4,6 @@ import com.bernardo.geradortimes.shared.enums.TokenType;
 import com.bernardo.geradortimes.user.model.VerificationToken;
 import com.bernardo.geradortimes.user.repository.VerificationTokenRepository;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -28,7 +27,6 @@ public class VerificationTokenService {
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
-//    @Value("${app.verification.token.expiration-minutes}")
     private static final int EXPIRATION_MINUTES = 15;
 
     private final VerificationTokenRepository verificationTokenRepository;
