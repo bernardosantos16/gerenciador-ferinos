@@ -18,11 +18,11 @@ public class RabbitMQConfig {
     @Value("${app.rabbitmq.exchange:user.events}")
     private String exchange;
 
-    @Value("${app.rabbitmq.queue:user.email.confirmation.queue}")
-    private String confirmationQueue;
+    @Value("${app.rabbitmq.email-verification.queue:user.email.verification.queue}")
+    private String emailVerificationQueue;
 
-    @Value("${app.rabbitmq.routing-key:user.registered}")
-    private String confirmationRoutingKey;
+    @Value("${app.rabbitmq.email-verification.routing-key:user.email-verification}")
+    private String emailVerificationRoutingKey;
 
     @Value("${app.rabbitmq.password-reset.queue:user.email.password-reset.queue}")
     private String passwordResetQueue;
@@ -49,16 +49,6 @@ public class RabbitMQConfig {
     }
 
     @Bean
-    public Queue userEmailConfirmationQueue() {
-        return new Queue(confirmationQueue, true);
-    }
-
-    @Bean
-    public Binding confirmationBinding(Queue userEmailConfirmationQueue, TopicExchange userExchange) {
-        return BindingBuilder.bind(userEmailConfirmationQueue).to(userExchange).with(confirmationRoutingKey);
-    }
-
-    @Bean
     public Queue userEmailPasswordResetQueue() {
         return new Queue(passwordResetQueue, true);
     }
@@ -66,5 +56,15 @@ public class RabbitMQConfig {
     @Bean
     public Binding passwordResetBinding(Queue userEmailPasswordResetQueue, TopicExchange userExchange) {
         return BindingBuilder.bind(userEmailPasswordResetQueue).to(userExchange).with(passwordResetRoutingKey);
+    }
+
+    @Bean
+    public Queue userEmailVerificationQueue() {
+        return new Queue(emailVerificationQueue, true);
+    }
+
+    @Bean
+    public Binding emailVerificationBinding(Queue userEmailVerificationQueue, TopicExchange userExchange) {
+        return BindingBuilder.bind(userEmailVerificationQueue).to(userExchange).with(emailVerificationRoutingKey);
     }
 }

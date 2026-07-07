@@ -7,19 +7,20 @@ import org.springframework.data.jpa.repository.Query;
 
 import java.time.Instant;
 import java.util.Optional;
-import java.util.UUID;
 
 public interface VerificationTokenRepository extends JpaRepository<VerificationToken, Long> {
 
-    Optional<VerificationToken> findByTokenHashAndType(String tokenHash, TokenType type);
+    Optional<VerificationToken> findByTokenHashAndTypeAndEmail(String tokenHash, TokenType type, String email);
 
     @Query("""
         SELECT v FROM VerificationToken v
-        WHERE v.userId = :userId
+        WHERE v.email = :email
           AND v.type = :type
           AND v.usedAt IS NULL
           AND v.expiresAt > :now
         """)
-    Optional<VerificationToken> findActiveByUserIdAndType(UUID userId, TokenType type, Instant now);
+    Optional<VerificationToken> findActiveByEmailAndType(String email, TokenType type, Instant now);
+
+    void deleteByExpiresAtBeforeOrUsedAtIsNotNull(Instant now);
 
 }

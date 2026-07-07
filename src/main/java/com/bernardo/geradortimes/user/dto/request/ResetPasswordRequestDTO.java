@@ -1,10 +1,16 @@
 package com.bernardo.geradortimes.user.dto.request;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 public record ResetPasswordRequestDTO(
+        @Schema(description = "Email do usuario.", example = "joao@example.com", maxLength = 100)
+        @NotBlank
+        @Email
+        String email,
+
         @Schema(description = "Token de recuperacao de senha enviado por email.", example = "123456")
         @NotBlank
         String token,

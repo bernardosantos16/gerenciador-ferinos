@@ -3,7 +3,9 @@ package com.bernardo.geradortimes.user.controller;
 import com.bernardo.geradortimes.user.dto.request.CreateUserRequestDTO;
 import com.bernardo.geradortimes.user.dto.request.SendEmailTokenRequestDTO;
 import com.bernardo.geradortimes.user.dto.request.ResetPasswordRequestDTO;
+import com.bernardo.geradortimes.user.dto.request.VerifyEmailRequestDTO;
 import com.bernardo.geradortimes.user.dto.response.UserResponseDTO;
+import com.bernardo.geradortimes.user.dto.response.VerifyEmailResponseDTO;
 import com.bernardo.geradortimes.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -25,7 +27,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
@@ -44,14 +45,47 @@ public class UserController {
     }
 
     @Operation(
+            summary = "Enviar codigo de verificacao de email",
+            description = "Endpoint publico. Envia um codigo de 6 digitos para o email informado. Necessario antes do cadastro.",
+            security = {}
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Codigo enviado com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Dados invalidos", content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "409", description = "Email ja cadastrado", content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    @PostMapping("/email")
+    public ResponseEntity<Void> sendEmailVerification(@Valid @RequestBody SendEmailTokenRequestDTO request) {
+        userService.sendEmailVerification(request.login());
+        return ResponseEntity.noContent().build();
+    }
+
+    @Operation(
+            summary = "Verificar codigo de email",
+            description = "Endpoint publico. Valida o codigo OTP de verificacao, consome o OTP e retorna um token de registro JWT para ser usado na etapa de cadastro.",
+            security = {}
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Codigo valido, token de registro gerado"),
+            @ApiResponse(responseCode = "400", description = "Dados invalidos", content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "404", description = "Token invalido ou expirado", content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    @PostMapping("/verify-email")
+    public ResponseEntity<VerifyEmailResponseDTO> verifyEmail(@Valid @RequestBody VerifyEmailRequestDTO request) {
+        String registrationToken = userService.verifyEmail(request.login(), request.token());
+        return ResponseEntity.ok(new VerifyEmailResponseDTO(registrationToken));
+    }
+
+    @Operation(
             summary = "Criar um novo usuario",
-            description = "Endpoint publico para cadastro de um novo usuario. O status inicial e PENDING e um email de verificacao e enviado.",
+            description = "Endpoint publico para cadastro de um novo usuario. Requer token de registro JWT (obtido na etapa de verificacao de email). O email e extraido do JWT. O usuario e criado com status ACTIVE.",
             security = {}
     )
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Usuario criado com sucesso"),
-            @ApiResponse(responseCode = "400", description = "Dados invalidos (ex: senha curta, email invalido)", content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
-            @ApiResponse(responseCode = "409", description = "Login ou nickname ja estao em uso", content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+            @ApiResponse(responseCode = "400", description = "Dados invalidos (ex: senha curta)", content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "404", description = "Token de registro invalido ou expirado", content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "409", description = "Nickname ja esta em uso", content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
     @PostMapping
     public ResponseEntity<UserResponseDTO> create(@Valid @RequestBody CreateUserRequestDTO request) {
@@ -98,37 +132,6 @@ public class UserController {
     }
 
     @Operation(
-            summary = "Verificar email via token",
-            description = "Endpoint publico. Recebe um token de 6 digitos e ativa a conta do usuario.",
-            security = {}
-    )
-    @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Email verificado com sucesso"),
-            @ApiResponse(responseCode = "404", description = "Token invalido ou expirado", content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-    })
-    @GetMapping("/verify-email")
-    public ResponseEntity<Void> verifyEmail(@RequestParam String token) {
-        userService.verifyEmailToken(token);
-        return ResponseEntity.noContent().build();
-    }
-
-    @Operation(
-            summary = "Reenviar email de verificacao",
-            description = "Endpoint publico. Reenvia o token de verificacao para o email informado. "
-                    + "Ignorado silenciosamente se o email nao for encontrado, ja estiver ativo ou ja possuir um token ativo.",
-            security = {}
-    )
-    @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Solicitacao processada"),
-            @ApiResponse(responseCode = "400", description = "Dados invalidos", content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-    })
-    @PostMapping("/resend-verification")
-    public ResponseEntity<Void> resendVerification(@Valid @RequestBody SendEmailTokenRequestDTO request) {
-        userService.resendVerification(request.login());
-        return ResponseEntity.noContent().build();
-    }
-
-    @Operation(
             summary = "Solicitar recuperacao de senha",
             description = "Endpoint publico. Envia um token de recuperacao de senha por email.",
             security = {}
@@ -145,7 +148,7 @@ public class UserController {
 
     @Operation(
             summary = "Redefinir senha com token",
-            description = "Endpoint publico. Recebe o token de recuperacao e a nova senha.",
+            description = "Endpoint publico. Recebe o email, o token de recuperacao e a nova senha.",
             security = {}
     )
     @ApiResponses({
@@ -155,7 +158,7 @@ public class UserController {
     })
     @PostMapping("/reset-password")
     public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequestDTO request) {
-        userService.resetPassword(request.token(), request.newPassword());
+        userService.resetPassword(request.email(), request.token(), request.newPassword());
         return ResponseEntity.noContent().build();
     }
 

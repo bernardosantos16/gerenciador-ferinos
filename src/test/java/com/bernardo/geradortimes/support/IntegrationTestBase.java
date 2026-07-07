@@ -205,12 +205,29 @@ public abstract class IntegrationTestBase {
     }
 
     /**
-     * Generates a 6-digit verification token, hashes it (SHA-256), persists a
-     * {@link VerificationToken} of type {@link TokenType#ACCOUNT_VERIFICATION}
-     * with a 15-minute expiry for the given user, and returns the plain token.
+     * Generates a registration JWT for the given email, matching the format
+     * produced by {@link com.bernardo.geradortimes.auth.security.JwtService#issueRegistrationToken}.
      */
-    protected String createVerificationToken(User user) {
-        return createToken(user, TokenType.ACCOUNT_VERIFICATION);
+    protected String createRegistrationJwt(String email) {
+        Algorithm algorithm = Algorithm.HMAC256(JWT_SECRET);
+        Instant now = Instant.now();
+        return JWT.create()
+                .withIssuer(JWT_ISSUER)
+                .withSubject(email)
+                .withIssuedAt(Date.from(now))
+                .withExpiresAt(Date.from(now.plusSeconds(1800)))
+                .withClaim("email", email)
+                .withClaim("purpose", "registration")
+                .sign(algorithm);
+    }
+
+    /**
+     * Generates a 6-digit verification token, hashes it (SHA-256), persists a
+     * {@link VerificationToken} of type {@link TokenType#EMAIL_VERIFICATION}
+     * with a 15-minute expiry for the given email, and returns the plain token.
+     */
+    protected String createVerificationToken(String email) {
+        return createToken(email, TokenType.EMAIL_VERIFICATION);
     }
 
     /**
@@ -219,10 +236,10 @@ public abstract class IntegrationTestBase {
      * with a 15-minute expiry for the given user, and returns the plain token.
      */
     protected String createPasswordResetToken(User user) {
-        return createToken(user, TokenType.PASSWORD_RESET);
+        return createToken(user.getLogin().getValue(), TokenType.PASSWORD_RESET);
     }
 
-    private String createToken(User user, TokenType type) {
+    private String createToken(String email, TokenType type) {
         int raw = 100000 + new java.security.SecureRandom().nextInt(900000);
         String token = String.valueOf(raw);
         String hash = sha256(token);
@@ -230,7 +247,7 @@ public abstract class IntegrationTestBase {
                 hash,
                 type,
                 Instant.now().plus(15, ChronoUnit.MINUTES),
-                user.getId()
+                email
         );
         verificationTokenRepository.save(vt);
         return token;

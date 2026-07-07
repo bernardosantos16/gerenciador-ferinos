@@ -1,7 +1,6 @@
 package com.bernardo.geradortimes.user.dto.request;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
@@ -20,12 +19,6 @@ public record CreateUserRequestDTO(
         @Size(max = 100)
         String nickname,
 
-        @Schema(description = "Login (email) do usuario. Deve ser unico.", example = "joao@example.com", maxLength = 100)
-        @NotBlank
-        @Size(max = 100)
-        @Email
-        String login,
-
         @Schema(
                 description = "Senha em texto puro. Minimo 8 e maximo 72 caracteres.",
                 example = "S3nh4F0rt3!",
@@ -34,6 +27,10 @@ public record CreateUserRequestDTO(
         )
         @NotBlank
         @Size(min = 8, max = 72)
-        String password
+        String password,
+
+        @Schema(description = "Token de registro JWT obtido na etapa de verificacao de email.", example = "eyJ...")
+        @NotBlank
+        String registrationToken
 ) {
 }

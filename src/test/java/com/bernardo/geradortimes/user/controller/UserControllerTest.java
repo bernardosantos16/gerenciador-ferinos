@@ -5,8 +5,9 @@ import com.bernardo.geradortimes.shared.enums.TokenType;
 import com.bernardo.geradortimes.shared.enums.UserRole;
 import com.bernardo.geradortimes.support.IntegrationTestBase;
 import com.bernardo.geradortimes.user.dto.request.CreateUserRequestDTO;
-import com.bernardo.geradortimes.user.dto.request.SendEmailTokenRequestDTO;
 import com.bernardo.geradortimes.user.dto.request.ResetPasswordRequestDTO;
+import com.bernardo.geradortimes.user.dto.request.SendEmailTokenRequestDTO;
+import com.bernardo.geradortimes.user.dto.request.VerifyEmailRequestDTO;
 import com.bernardo.geradortimes.user.model.User;
 import com.bernardo.geradortimes.user.model.VerificationToken;
 import org.junit.jupiter.api.DisplayName;
@@ -21,17 +22,143 @@ import java.util.UUID;
 import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
  * Integration tests for {@link UserController}.
  * <p>
- * Covers: criar usuario, buscar por ID, listar (ADMIN), deletar, verificar email,
- * solicitar recuperacao de senha e redefinir senha.
+ * Covers: verificacao de email, confirmacao de email, criar usuario, buscar por ID,
+ * listar (ADMIN), deletar, solicitar recuperacao de senha e redefinir senha.
  */
 @DisplayName("UserController – Integration Tests")
 class UserControllerTest extends IntegrationTestBase {
+
+    // ── POST /api/users/email ─────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("POST /api/users/email")
+    class SendEmailVerification {
+
+        @Test
+        @DisplayName("deve retornar 204 quando o email nao esta cadastrado")
+        void sendEmailVerificationSuccess() throws Exception {
+            var request = new SendEmailTokenRequestDTO("novo@example.com");
+
+            mockMvc.perform(post("/api/users/email")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(request)))
+                    .andExpect(status().isNoContent());
+        }
+
+        @Test
+        @DisplayName("deve retornar 409 quando o email ja esta cadastrado")
+        void sendEmailVerificationAlreadyRegistered() throws Exception {
+            createActiveUser("exist@example.com", "exist_nick");
+            var request = new SendEmailTokenRequestDTO("exist@example.com");
+
+            mockMvc.perform(post("/api/users/email")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(request)))
+                    .andExpect(status().isConflict());
+        }
+
+        @Test
+        @DisplayName("deve retornar 400 quando o email e invalido")
+        void sendEmailVerificationInvalidEmail() throws Exception {
+            var request = new SendEmailTokenRequestDTO("invalid-email");
+
+            mockMvc.perform(post("/api/users/email")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(request)))
+                    .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("deve ignorar chamadas repetidas dentro da janela de expiracao")
+        void sendEmailVerificationRateLimit() throws Exception {
+            var request = new SendEmailTokenRequestDTO("ratelimit@example.com");
+
+            // Primeira chamada
+            mockMvc.perform(post("/api/users/email")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(request)))
+                    .andExpect(status().isNoContent());
+
+            // Segunda chamada — ignorada
+            mockMvc.perform(post("/api/users/email")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(request)))
+                    .andExpect(status().isNoContent());
+
+            // Apenas 1 token deve ter sido persistido
+            var tokens = verificationTokenRepository.findAll().stream()
+                    .filter(vt -> vt.getType() == TokenType.EMAIL_VERIFICATION
+                            && vt.getEmail().equals("ratelimit@example.com"))
+                    .toList();
+            assertEquals(1, tokens.size());
+        }
+    }
+
+    // ── POST /api/users/verify-email ──────────────────────────────────────────
+
+    @Nested
+    @DisplayName("POST /api/users/verify-email")
+    class VerifyEmail {
+
+        @Test
+        @DisplayName("deve retornar 200 com registrationToken quando o OTP e valido e consumi-lo")
+        void verifyEmailSuccess() throws Exception {
+            String token = createVerificationToken("verify@example.com");
+            var request = new VerifyEmailRequestDTO("verify@example.com", token);
+
+            mockMvc.perform(post("/api/users/verify-email")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(request)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.registrationToken", not(emptyString())));
+
+            // Verifica que o OTP foi consumido
+            var consumed = verificationTokenRepository
+                    .findByTokenHashAndTypeAndEmail(sha256(token), TokenType.EMAIL_VERIFICATION, "verify@example.com");
+            assertTrue(consumed.isPresent());
+            assertNotNull(consumed.get().getUsedAt());
+        }
+
+        @Test
+        @DisplayName("deve retornar 404 quando o token nao existe")
+        void verifyEmailInvalidToken() throws Exception {
+            var request = new VerifyEmailRequestDTO("nope@example.com", "000000");
+
+            mockMvc.perform(post("/api/users/verify-email")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(request)))
+                    .andExpect(status().isNotFound());
+        }
+
+        @Test
+        @DisplayName("deve retornar 401 quando o OTP ja foi consumido")
+        void verifyEmailTokenAlreadyUsed() throws Exception {
+            String email = "used_otp@example.com";
+            String token = createVerificationToken(email);
+
+            // Consome o token na primeira chamada
+            var request1 = new VerifyEmailRequestDTO(email, token);
+            mockMvc.perform(post("/api/users/verify-email")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(request1)))
+                    .andExpect(status().isOk());
+
+            // Segunda chamada com mesmo OTP deve falhar
+            var request2 = new VerifyEmailRequestDTO(email, token);
+            mockMvc.perform(post("/api/users/verify-email")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(request2)))
+                    .andExpect(status().isUnauthorized());
+        }
+    }
 
     // ── POST /api/users ───────────────────────────────────────────────────────
 
@@ -39,11 +166,15 @@ class UserControllerTest extends IntegrationTestBase {
     @DisplayName("POST /api/users")
     class CreateUser {
 
+        private static CreateUserRequestDTO buildRequest(String name, String nickname, String password, String registrationToken) {
+            return new CreateUserRequestDTO(name, nickname, password, registrationToken);
+        }
+
         @Test
-        @DisplayName("deve criar usuario e retornar 201 (endpoint publico)")
+        @DisplayName("deve criar usuario com status ACTIVE e retornar 201")
         void createSuccess() throws Exception {
-            var request = new CreateUserRequestDTO(
-                    "Joao Teste", "joao_teste", "joao@example.com", "Senha@1234");
+            String registrationJwt = createRegistrationJwt("joao@example.com");
+            var request = buildRequest("Joao Teste", "joao_teste", "Senha@1234", registrationJwt);
 
             mockMvc.perform(post("/api/users")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -52,6 +183,9 @@ class UserControllerTest extends IntegrationTestBase {
                     .andExpect(jsonPath("$.id", not(emptyString())))
                     .andExpect(jsonPath("$.nickname", is("joao_teste")))
                     .andExpect(jsonPath("$.login", is("joao@example.com")));
+
+            User user = userRepository.findByLogin_Value("joao@example.com").orElseThrow();
+            assertEquals(ActivityStatus.ACTIVE, user.getStatus());
         }
 
         @Test
@@ -59,8 +193,8 @@ class UserControllerTest extends IntegrationTestBase {
         void createDuplicateLogin() throws Exception {
             createActiveUser("dup@example.com", "dup_nick");
 
-            var request = new CreateUserRequestDTO(
-                    "Outro Nome", "outro_nick", "dup@example.com", "Senha@1234");
+            String registrationJwt = createRegistrationJwt("dup@example.com");
+            var request = buildRequest("Outro Nome", "outro_nick", "Senha@1234", registrationJwt);
 
             mockMvc.perform(post("/api/users")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -73,8 +207,8 @@ class UserControllerTest extends IntegrationTestBase {
         void createDuplicateNickname() throws Exception {
             createActiveUser("first@example.com", "same_nick");
 
-            var request = new CreateUserRequestDTO(
-                    "Outro Nome", "same_nick", "second@example.com", "Senha@1234");
+            String registrationJwt = createRegistrationJwt("second@example.com");
+            var request = buildRequest("Outro Nome", "same_nick", "Senha@1234", registrationJwt);
 
             mockMvc.perform(post("/api/users")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -85,13 +219,38 @@ class UserControllerTest extends IntegrationTestBase {
         @Test
         @DisplayName("deve retornar 400 quando o body e invalido (senha curta)")
         void createInvalidBody() throws Exception {
-            var request = new CreateUserRequestDTO(
-                    "Nome", "nick_val", "valid@example.com", "123");
+            String registrationJwt = createRegistrationJwt("valid@example.com");
+            var request = buildRequest("Nome", "nick_val", "123", registrationJwt);
 
             mockMvc.perform(post("/api/users")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(toJson(request)))
                     .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("deve retornar 404 quando o token de registro e invalido")
+        void createInvalidToken() throws Exception {
+            var request = buildRequest("Nome", "nick_val", "Senha@1234", "token-invalido");
+
+            mockMvc.perform(post("/api/users")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(request)))
+                    .andExpect(status().isNotFound());
+        }
+
+        @Test
+        @DisplayName("deve retornar 404 quando o token de registro e de outro tipo (access token)")
+        void createWrongTokenPurpose() throws Exception {
+            User user = createActiveUser("purpose@example.com", "purpose_nick");
+            String accessToken = bearerToken(user).replace("Bearer ", "");
+
+            var request = buildRequest("Nome", "nick_purpose", "Senha@1234", accessToken);
+
+            mockMvc.perform(post("/api/users")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(request)))
+                    .andExpect(status().isNotFound());
         }
     }
 
@@ -227,131 +386,6 @@ class UserControllerTest extends IntegrationTestBase {
         }
     }
 
-    // ── GET /api/users/verify-email ───────────────────────────────────────────
-
-    @Nested
-    @DisplayName("GET /api/users/verify-email")
-    class VerifyEmail {
-
-        @Test
-        @DisplayName("deve retornar 204 e ativar o usuario quando o token e valido")
-        void verifyEmailSuccess() throws Exception {
-            User user = User.create(
-                    "Pending User",
-                    com.bernardo.geradortimes.shared.value_object.Nickname.of("pending_nick"),
-                    com.bernardo.geradortimes.shared.value_object.Email.of("pending@example.com"),
-                    com.bernardo.geradortimes.shared.value_object.PasswordHash.fromEncoded(
-                            "$argon2id$v=19$m=65536,t=3,p=4$placeholder$placeholder")
-            );
-            userRepository.save(user);
-            String token = createVerificationToken(user);
-
-            mockMvc.perform(get("/api/users/verify-email")
-                            .param("token", token))
-                    .andExpect(status().isNoContent());
-
-            User updated = userRepository.findByLogin_Value("pending@example.com").orElseThrow();
-            assertEquals(ActivityStatus.ACTIVE, updated.getStatus());
-        }
-
-        @Test
-        @DisplayName("deve retornar 404 quando o token nao existe")
-        void verifyEmailInvalidToken() throws Exception {
-            mockMvc.perform(get("/api/users/verify-email")
-                            .param("token", "000000"))
-                    .andExpect(status().isNotFound());
-        }
-    }
-
-    // ── POST /api/users/resend-verification ────────────────────────────────────
-
-    @Nested
-    @DisplayName("POST /api/users/resend-verification")
-    class ResendVerification {
-
-        @Test
-        @DisplayName("deve retornar 204 e gerar novo token quando usuario esta PENDING")
-        void resendVerificationSuccess() throws Exception {
-            User user = User.create(
-                    "Pending User",
-                    com.bernardo.geradortimes.shared.value_object.Nickname.of("resend_pending"),
-                    com.bernardo.geradortimes.shared.value_object.Email.of("resend@example.com"),
-                    com.bernardo.geradortimes.shared.value_object.PasswordHash.fromEncoded(
-                            "$argon2id$v=19$m=65536,t=3,p=4$placeholder$placeholder")
-            );
-            userRepository.save(user);
-            var request = new SendEmailTokenRequestDTO("resend@example.com");
-
-            mockMvc.perform(post("/api/users/resend-verification")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(toJson(request)))
-                    .andExpect(status().isNoContent());
-        }
-
-        @Test
-        @DisplayName("deve retornar 204 sem gerar token quando o usuario ja esta ACTIVE")
-        void resendVerificationAlreadyActive() throws Exception {
-            User user = createActiveUser("active_resend@example.com", "active_resend");
-            var request = new SendEmailTokenRequestDTO("active_resend@example.com");
-
-            mockMvc.perform(post("/api/users/resend-verification")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(toJson(request)))
-                    .andExpect(status().isNoContent());
-
-            // Nenhum token ACCOUNT_VERIFICATION deve ter sido criado
-            var tokens = verificationTokenRepository.findAll().stream()
-                    .filter(vt -> vt.getType() == TokenType.ACCOUNT_VERIFICATION
-                            && vt.getUserId().equals(user.getId()))
-                    .toList();
-            assertEquals(0, tokens.size());
-        }
-
-        @Test
-        @DisplayName("deve retornar 204 mesmo quando o email nao existe (por seguranca)")
-        void resendVerificationEmailNotFound() throws Exception {
-            var request = new SendEmailTokenRequestDTO("nonexistent@example.com");
-
-            mockMvc.perform(post("/api/users/resend-verification")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(toJson(request)))
-                    .andExpect(status().isNoContent());
-        }
-
-        @Test
-        @DisplayName("deve ignorar chamadas repetidas dentro da janela de expiracao (rate limit)")
-        void resendVerificationRateLimit() throws Exception {
-            User user = User.create(
-                    "Pending RateLimit",
-                    com.bernardo.geradortimes.shared.value_object.Nickname.of("resend_ratelimit"),
-                    com.bernardo.geradortimes.shared.value_object.Email.of("resend_rl@example.com"),
-                    com.bernardo.geradortimes.shared.value_object.PasswordHash.fromEncoded(
-                            "$argon2id$v=19$m=65536,t=3,p=4$placeholder$placeholder")
-            );
-            userRepository.save(user);
-            var request = new SendEmailTokenRequestDTO("resend_rl@example.com");
-
-            // Primeira chamada
-            mockMvc.perform(post("/api/users/resend-verification")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(toJson(request)))
-                    .andExpect(status().isNoContent());
-
-            // Segunda chamada — ignorada
-            mockMvc.perform(post("/api/users/resend-verification")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(toJson(request)))
-                    .andExpect(status().isNoContent());
-
-            // Apenas 1 token deve ter sido persistido
-            var tokens = verificationTokenRepository.findAll().stream()
-                    .filter(vt -> vt.getType() == TokenType.ACCOUNT_VERIFICATION
-                            && vt.getUserId().equals(user.getId()))
-                    .toList();
-            assertEquals(1, tokens.size(), "Deve existir apenas 1 token ACCOUNT_VERIFICATION para o usuario");
-        }
-    }
-
     // ── POST /api/users/forgot-password ───────────────────────────────────────
 
     @Nested
@@ -412,9 +446,10 @@ class UserControllerTest extends IntegrationTestBase {
 
             // Apenas 1 token deve ter sido persistido
             var passwordResetTokens = verificationTokenRepository.findAll().stream()
-                    .filter(vt -> vt.getType() == TokenType.PASSWORD_RESET && vt.getUserId().equals(user.getId()))
+                    .filter(vt -> vt.getType() == TokenType.PASSWORD_RESET
+                            && vt.getEmail().equals("ratelimit@example.com"))
                     .toList();
-            assertEquals(1, passwordResetTokens.size(), "Deve existir apenas 1 token PASSWORD_RESET para o usuario");
+            assertEquals(1, passwordResetTokens.size(), "Deve existir apenas 1 token PASSWORD_RESET para o email");
         }
     }
 
@@ -429,7 +464,7 @@ class UserControllerTest extends IntegrationTestBase {
         void resetPasswordSuccess() throws Exception {
             User user = createActiveUser("reset@example.com", "reset_nick");
             String token = createPasswordResetToken(user);
-            var request = new ResetPasswordRequestDTO(token, "N0v@S3nh4F0rt3!");
+            var request = new ResetPasswordRequestDTO("reset@example.com", token, "N0v@S3nh4F0rt3!");
 
             mockMvc.perform(post("/api/users/reset-password")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -440,7 +475,7 @@ class UserControllerTest extends IntegrationTestBase {
         @Test
         @DisplayName("deve retornar 404 quando o token nao existe")
         void resetPasswordInvalidToken() throws Exception {
-            var request = new ResetPasswordRequestDTO("000000", "N0v@S3nh4F0rt3!");
+            var request = new ResetPasswordRequestDTO("nope@example.com", "000000", "N0v@S3nh4F0rt3!");
 
             mockMvc.perform(post("/api/users/reset-password")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -456,14 +491,15 @@ class UserControllerTest extends IntegrationTestBase {
 
             // Marca o token como usado manualmente
             var vt = verificationTokenRepository
-                    .findByTokenHashAndType(
+                    .findByTokenHashAndTypeAndEmail(
                             sha256(token),
-                            com.bernardo.geradortimes.shared.enums.TokenType.PASSWORD_RESET)
+                            TokenType.PASSWORD_RESET,
+                            "usedtoken@example.com")
                     .orElseThrow();
             vt.markUsed();
             verificationTokenRepository.save(vt);
 
-            var request = new ResetPasswordRequestDTO(token, "N0v@S3nh4F0rt3!");
+            var request = new ResetPasswordRequestDTO("usedtoken@example.com", token, "N0v@S3nh4F0rt3!");
 
             mockMvc.perform(post("/api/users/reset-password")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -481,13 +517,13 @@ class UserControllerTest extends IntegrationTestBase {
             // Cria um token expirado (-1 minuto de expiracao)
             VerificationToken vt = VerificationToken.create(
                     hash,
-                    com.bernardo.geradortimes.shared.enums.TokenType.PASSWORD_RESET,
+                    TokenType.PASSWORD_RESET,
                     Instant.now().minus(1, ChronoUnit.MINUTES),
-                    user.getId()
+                    "expired@example.com"
             );
             verificationTokenRepository.save(vt);
 
-            var request = new ResetPasswordRequestDTO(token, "N0v@S3nh4F0rt3!");
+            var request = new ResetPasswordRequestDTO("expired@example.com", token, "N0v@S3nh4F0rt3!");
 
             mockMvc.perform(post("/api/users/reset-password")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -500,7 +536,7 @@ class UserControllerTest extends IntegrationTestBase {
         void resetPasswordInvalidBody() throws Exception {
             User user = createActiveUser("shortpw@example.com", "shortpw_nick");
             String token = createPasswordResetToken(user);
-            var request = new ResetPasswordRequestDTO(token, "123");
+            var request = new ResetPasswordRequestDTO("shortpw@example.com", token, "123");
 
             mockMvc.perform(post("/api/users/reset-password")
                             .contentType(MediaType.APPLICATION_JSON)

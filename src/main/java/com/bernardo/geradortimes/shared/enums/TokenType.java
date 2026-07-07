@@ -1,6 +1,6 @@
 package com.bernardo.geradortimes.shared.enums;
 
 public enum TokenType {
-    ACCOUNT_VERIFICATION,
+    EMAIL_VERIFICATION,
     PASSWORD_RESET
 }

@@ -5,7 +5,6 @@ import jakarta.persistence.*;
 import lombok.Getter;
 
 import java.time.Instant;
-import java.util.UUID;
 
 @Entity
 @Table(name = "verification_tokens")
@@ -30,21 +29,21 @@ public class VerificationToken {
     @Column(name = "used_at")
     private Instant usedAt;
 
-    @Column(name = "user_id")
-    private UUID userId;
+    @Column(nullable = false, length = 100)
+    private String email;
 
     protected VerificationToken() {
     }
 
-    private VerificationToken(String tokenHash, TokenType type, Instant expiresAt, UUID userId) {
+    private VerificationToken(String tokenHash, TokenType type, Instant expiresAt, String email) {
         this.tokenHash = tokenHash;
         this.type = type;
         this.expiresAt = expiresAt;
-        this.userId = userId;
+        this.email = email;
     }
 
-    public static VerificationToken create(String tokenHash, TokenType type, Instant expiresAt, UUID userId) {
-        return new VerificationToken(tokenHash, type, expiresAt, userId);
+    public static VerificationToken create(String tokenHash, TokenType type, Instant expiresAt, String email) {
+        return new VerificationToken(tokenHash, type, expiresAt, email);
     }
 
     public boolean isExpired() {

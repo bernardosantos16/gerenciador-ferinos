@@ -165,6 +165,8 @@ public class ApiExceptionHandler {
         return switch (message) {
             case "nickname already exists" -> "nickname";
             case "login already exists" -> "login";
+            case "email already registered" -> "login";
+            case "invalid or expired verification token" -> "token";
             default -> "global";
         };
     }
