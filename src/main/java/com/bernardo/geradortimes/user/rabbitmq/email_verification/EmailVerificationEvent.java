@@ -1,4 +1,4 @@
-package com.bernardo.geradortimes.user.rabbitmq;
+package com.bernardo.geradortimes.user.rabbitmq.email_verification;
 
 import com.bernardo.geradortimes.shared.enums.TokenType;
 

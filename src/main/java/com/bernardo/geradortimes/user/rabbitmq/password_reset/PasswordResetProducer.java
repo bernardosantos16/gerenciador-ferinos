@@ -1,4 +1,4 @@
-package com.bernardo.geradortimes.user.rabbitmq;
+package com.bernardo.geradortimes.user.rabbitmq.password_reset;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;

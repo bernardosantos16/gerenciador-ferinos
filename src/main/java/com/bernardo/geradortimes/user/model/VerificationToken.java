@@ -3,6 +3,7 @@ package com.bernardo.geradortimes.user.model;
 import com.bernardo.geradortimes.shared.enums.TokenType;
 import jakarta.persistence.*;
 import lombok.Getter;
+import lombok.Setter;
 
 import java.time.Instant;
 
@@ -17,6 +18,7 @@ public class VerificationToken {
     private Long id;
 
     @Column(name = "token_hash", nullable = false, length = 64)
+    @Setter
     private String tokenHash;
 
     @Enumerated(EnumType.STRING)
@@ -24,6 +26,7 @@ public class VerificationToken {
     private TokenType type;
 
     @Column(name = "expires_at", nullable = false)
+    @Setter
     private Instant expiresAt;
 
     @Column(name = "used_at")

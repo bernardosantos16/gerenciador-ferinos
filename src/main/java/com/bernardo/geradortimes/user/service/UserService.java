@@ -12,10 +12,11 @@ import com.bernardo.geradortimes.shared.value_object.PasswordHash;
 import com.bernardo.geradortimes.user.dto.request.CreateUserRequestDTO;
 import com.bernardo.geradortimes.user.dto.response.UserResponseDTO;
 import com.bernardo.geradortimes.user.model.User;
-import com.bernardo.geradortimes.user.rabbitmq.EmailVerificationEvent;
-import com.bernardo.geradortimes.user.rabbitmq.EmailVerificationProducer;
-import com.bernardo.geradortimes.user.rabbitmq.PasswordResetEvent;
-import com.bernardo.geradortimes.user.rabbitmq.PasswordResetProducer;
+import com.bernardo.geradortimes.user.model.VerificationToken;
+import com.bernardo.geradortimes.user.rabbitmq.email_verification.EmailVerificationEvent;
+import com.bernardo.geradortimes.user.rabbitmq.email_verification.EmailVerificationProducer;
+import com.bernardo.geradortimes.user.rabbitmq.password_reset.PasswordResetEvent;
+import com.bernardo.geradortimes.user.rabbitmq.password_reset.PasswordResetProducer;
 import com.bernardo.geradortimes.user.repository.UserRepository;
 import com.bernardo.geradortimes.user.repository.VerificationTokenRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -63,11 +64,6 @@ public class UserService {
         if (userRepository.existsByLogin_Value(loginTrimmed)) {
             log.warn("Tentativa de verificacao de email ja cadastrado");
             throw new FieldValidationException(CONFLICT, "login", "email already registered");
-        }
-
-        if (verificationTokenRepository.findActiveByEmailAndType(loginTrimmed, TokenType.EMAIL_VERIFICATION, Instant.now()).isPresent()) {
-            log.info("Token de verificacao de email ainda ativo - ignorando - email: {}", loginTrimmed);
-            return;
         }
 
         String token = verificationTokenService.issueEmailVerificationToken(loginTrimmed);

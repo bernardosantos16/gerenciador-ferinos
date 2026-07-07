@@ -45,10 +45,24 @@ public class VerificationTokenService {
         String tokenHash = sha256(token);
         Instant expiresAt = Instant.now().plus(EXPIRATION_MINUTES, ChronoUnit.MINUTES);
 
-        VerificationToken vt = VerificationToken.create(tokenHash, TokenType.EMAIL_VERIFICATION, expiresAt, email);
-        verificationTokenRepository.save(vt);
-
-        log.info("Token de verificacao de email gerado - email: {}", email);
+        verificationTokenRepository.
+                findActiveByEmailAndType(email, TokenType.EMAIL_VERIFICATION, Instant.now()).ifPresentOrElse(
+                        verificationToken -> {
+                            verificationToken.setTokenHash(tokenHash);
+                            verificationToken.setExpiresAt(expiresAt);
+                            log.info("Token de verificacao de email atualizado - email: {}", email);
+                        },
+                        () -> {
+                            VerificationToken verificationToken = VerificationToken.create(
+                                    tokenHash,
+                                    TokenType.EMAIL_VERIFICATION,
+                                    expiresAt,
+                                    email
+                            );
+                            verificationTokenRepository.save(verificationToken);
+                            log.info("Token de verificacao de email gerado - email: {}", email);
+                        }
+                );
         return token;
     }
 
