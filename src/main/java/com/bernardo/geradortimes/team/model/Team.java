@@ -24,6 +24,9 @@ public class Team {
     @Column(name = "club_jersey_id")
     private Long clubJerseyId;
 
+    @Column(name = "score")
+    private Double score;
+
     protected Team() {}
 
     private Team(UUID matchId, Long clubJerseyId) {
@@ -37,5 +40,9 @@ public class Team {
 
     public void changeJersey(Long clubJerseyId) {
         this.clubJerseyId = clubJerseyId;
+    }
+
+    public void changeScore(Double score) {
+        this.score = score;
     }
 }

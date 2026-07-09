@@ -12,7 +12,6 @@ import com.bernardo.geradortimes.shared.value_object.PasswordHash;
 import com.bernardo.geradortimes.user.dto.request.CreateUserRequestDTO;
 import com.bernardo.geradortimes.user.dto.response.UserResponseDTO;
 import com.bernardo.geradortimes.user.model.User;
-import com.bernardo.geradortimes.user.model.VerificationToken;
 import com.bernardo.geradortimes.user.rabbitmq.email_verification.EmailVerificationEvent;
 import com.bernardo.geradortimes.user.rabbitmq.email_verification.EmailVerificationProducer;
 import com.bernardo.geradortimes.user.rabbitmq.password_reset.PasswordResetEvent;
@@ -58,6 +57,7 @@ public class UserService {
         this.emailVerificationProducer = emailVerificationProducer;
     }
 
+    @Transactional
     public void sendEmailVerification(String login) {
         String loginTrimmed = login == null ? null : login.trim();
 

@@ -12,6 +12,9 @@ public record TeamResponseDTO(
         UUID matchId,
 
         @Schema(description = "ID da camisa do clube usada pelo time.", example = "10", format = "int64", nullable = true)
-        Long clubJerseyId
+        Long clubJerseyId,
+
+        @Schema(description = "Score total do time, soma dos scores normalizados de todos os membros.", example = "4.25", nullable = true)
+        Double score
 ) {
 }

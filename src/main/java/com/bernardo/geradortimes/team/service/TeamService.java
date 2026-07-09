@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
@@ -249,11 +250,20 @@ public class TeamService {
 
         matchParticipantRepository.saveAll(participants);
 
+        for (TeamBucket b : buckets) {
+            savedTeams.stream()
+                    .filter(t -> t.getId().equals(b.teamId))
+                    .findFirst()
+                    .ifPresent(t -> t.changeScore(b.totalScore()));
+        }
+        teamRepository.saveAll(savedTeams);
+
         List<GeneratedTeamDTO> generatedTeams = buckets.stream()
                 .map(b -> new GeneratedTeamDTO(
                         b.teamId,
                         b.lineMembers.stream().map(x -> x.memberId).toList(),
-                        b.goalkeeperMemberId
+                        b.goalkeeperMemberId,
+                        b.totalScore()
                 ))
                 .toList();
 
@@ -342,6 +352,8 @@ public class TeamService {
         // Save all updated participants
         matchParticipantRepository.saveAll(allParticipants);
 
+        recalculateTeamScores(matchId);
+
         log.info(
                 "player swaps completed matchId={} swapCount={}",
                 matchId,
@@ -358,8 +370,60 @@ public class TeamService {
         teamRepository.delete(team);
     }
 
+    private void recalculateTeamScores(UUID matchId) {
+        List<MatchParticipant> participants = matchParticipantRepository.findByMatchId(matchId);
+        List<Team> teams = teamRepository.findByMatchId(matchId);
+
+        if (participants.isEmpty() || teams.isEmpty()) {
+            return;
+        }
+
+        List<ClubMember> lineMembers = new ArrayList<>();
+        List<ClubMember> goalMembers = new ArrayList<>();
+        Map<Long, ClubMember> membersById = new HashMap<>();
+
+        Match match = matchRepository.findById(matchId).orElseThrow();
+        List<ClubMember> allMembers = clubMemberRepository.findByClubIdAndIdIn(
+                match.getClubId(),
+                participants.stream().map(MatchParticipant::getClubMemberId).distinct().toList()
+        );
+        for (ClubMember m : allMembers) {
+            membersById.put(m.getId(), m);
+        }
+
+        for (MatchParticipant p : participants) {
+            ClubMember m = membersById.get(p.getClubMemberId());
+            if (m == null) continue;
+            if (p.getPosition() == MatchParticipantPosition.LINE) {
+                lineMembers.add(m);
+            } else if (p.getPosition() == MatchParticipantPosition.GOAL) {
+                goalMembers.add(m);
+            }
+        }
+
+        List<ScoredMember> scoredLine = scoreMembers(lineMembers);
+        List<ScoredMember> scoredGoal = scoreMembers(goalMembers);
+
+        Map<Long, Double> scoreByMemberId = new HashMap<>();
+        scoredLine.forEach(s -> scoreByMemberId.put(s.memberId(), s.score()));
+        scoredGoal.forEach(s -> scoreByMemberId.put(s.memberId(), s.score()));
+
+        Map<Long, List<MatchParticipant>> byTeam = participants.stream()
+                .filter(p -> p.getTeamId() != null)
+                .collect(Collectors.groupingBy(MatchParticipant::getTeamId));
+
+        for (Team team : teams) {
+            List<MatchParticipant> teamMembers = byTeam.getOrDefault(team.getId(), List.of());
+            double totalScore = teamMembers.stream()
+                    .mapToDouble(p -> scoreByMemberId.getOrDefault(p.getClubMemberId(), 0.0))
+                    .sum();
+            team.changeScore(totalScore);
+        }
+        teamRepository.saveAll(teams);
+    }
+
     private static TeamResponseDTO toResponse(Team team) {
-        return new TeamResponseDTO(team.getId(), team.getMatchId(), team.getClubJerseyId());
+        return new TeamResponseDTO(team.getId(), team.getMatchId(), team.getClubJerseyId(), team.getScore());
     }
 
     private static List<Long> normalizeIds(List<Long> ids, String fieldName) {

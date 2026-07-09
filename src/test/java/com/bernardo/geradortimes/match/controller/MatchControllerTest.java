@@ -2,6 +2,7 @@ package com.bernardo.geradortimes.match.controller;
 
 import com.bernardo.geradortimes.club.model.Club;
 import com.bernardo.geradortimes.club.model.ClubMember;
+import com.bernardo.geradortimes.match.dto.request.CreateMatchBatchRequestDTO;
 import com.bernardo.geradortimes.match.dto.request.CreateMatchRequestDTO;
 import com.bernardo.geradortimes.match.dto.request.SetMatchResultRequestDTO;
 import com.bernardo.geradortimes.match.model.Match;
@@ -20,7 +21,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 
+import java.time.DayOfWeek;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
@@ -557,6 +562,152 @@ class MatchControllerTest extends IntegrationTestBase {
             mockMvc.perform(delete("/api/matches/{id}", UUID.randomUUID())
                             .header("Authorization", bearerToken(director)))
                     .andExpect(status().isNotFound());
+        }
+    }
+
+    @Nested
+    @DisplayName("POST /api/matches/batch")
+    class CreateBatchMatch {
+
+        @Test
+        @DisplayName("deve criar partidas recorrentes e retornar 201")
+        void createBatchSuccess() throws Exception {
+            User director = createActiveUser("director_batch@match.com", "director_batch");
+            Club club = createClub("Clube Batch", "clube_batch");
+            createClubMember(director.getId(), club.getId(), ClubRole.DIRECTOR);
+
+            LocalDate today = LocalDate.now(ZoneOffset.UTC);
+            LocalDate startDate = today.plusDays(7);
+            LocalDate endDate = today.plusDays(35);
+            DayOfWeek dayOfWeek = startDate.getDayOfWeek();
+
+            var request = new CreateMatchBatchRequestDTO(
+                    club.getId(), dayOfWeek, LocalTime.of(20, 0), startDate, endDate, ZoneOffset.UTC
+            );
+
+            mockMvc.perform(post("/api/matches/batch")
+                            .header("Authorization", bearerToken(director))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(request)))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$", hasSize(5)))
+                    .andExpect(jsonPath("$[0].clubId", is(club.getId().toString())));
+        }
+
+        @Test
+        @DisplayName("deve retornar 403 quando usuario nao e DIRECTOR")
+        void createBatchForbiddenForMember() throws Exception {
+            User member = createActiveUser("member_batch@match.com", "member_batch");
+            Club club = createClub("Clube Batch2", "clube_batch2");
+            createClubMember(member.getId(), club.getId(), ClubRole.MEMBER);
+
+            LocalDate today = LocalDate.now(ZoneOffset.UTC);
+            LocalDate startDate = today.plusDays(7);
+            LocalDate endDate = today.plusDays(14);
+            DayOfWeek dayOfWeek = startDate.getDayOfWeek();
+
+            var request = new CreateMatchBatchRequestDTO(
+                    club.getId(), dayOfWeek, LocalTime.of(20, 0), startDate, endDate, ZoneOffset.UTC
+            );
+
+            mockMvc.perform(post("/api/matches/batch")
+                            .header("Authorization", bearerToken(member))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(request)))
+                    .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("deve retornar 401 quando nao autenticado")
+        void createBatchUnauthorized() throws Exception {
+            LocalDate today = LocalDate.now(ZoneOffset.UTC);
+            var request = new CreateMatchBatchRequestDTO(
+                    UUID.randomUUID(),
+                    DayOfWeek.TUESDAY,
+                    LocalTime.of(20, 0),
+                    today.plusDays(7),
+                    today.plusDays(14),
+                    ZoneOffset.UTC
+            );
+
+            mockMvc.perform(post("/api/matches/batch")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(request)))
+                    .andExpect(status().isUnauthorized());
+        }
+
+        @Test
+        @DisplayName("deve retornar 400 quando endDate e anterior a startDate")
+        void createBatchEndBeforeStart() throws Exception {
+            User director = createActiveUser("director_batch2@match.com", "director_batch2");
+            Club club = createClub("Clube Batch3", "clube_batch3");
+            createClubMember(director.getId(), club.getId(), ClubRole.DIRECTOR);
+
+            LocalDate today = LocalDate.now(ZoneOffset.UTC);
+            LocalDate startDate = today.plusDays(7);
+
+            var request = new CreateMatchBatchRequestDTO(
+                    club.getId(),
+                    DayOfWeek.TUESDAY,
+                    LocalTime.of(20, 0),
+                    startDate,
+                    startDate.minusDays(1),
+                    ZoneOffset.UTC
+            );
+
+            mockMvc.perform(post("/api/matches/batch")
+                            .header("Authorization", bearerToken(director))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(request)))
+                    .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("deve retornar 400 quando nenhuma data no intervalo corresponde ao dia da semana")
+        void createBatchNoDatesFound() throws Exception {
+            User director = createActiveUser("director_batch3@match.com", "director_batch3");
+            Club club = createClub("Clube Batch4", "clube_batch4");
+            createClubMember(director.getId(), club.getId(), ClubRole.DIRECTOR);
+
+            LocalDate today = LocalDate.now(ZoneOffset.UTC);
+            LocalDate startDate = today.plusDays(7);
+            LocalDate endDate = today.plusDays(8);
+            DayOfWeek differentDay = startDate.getDayOfWeek().plus(2);
+
+            var request = new CreateMatchBatchRequestDTO(
+                    club.getId(), differentDay, LocalTime.of(20, 0), startDate, endDate, ZoneOffset.UTC
+            );
+
+            mockMvc.perform(post("/api/matches/batch")
+                            .header("Authorization", bearerToken(director))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(request)))
+                    .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("deve retornar 400 quando startDate esta no passado")
+        void createBatchStartInPast() throws Exception {
+            User director = createActiveUser("director_batch4@match.com", "director_batch4");
+            Club club = createClub("Clube Batch5", "clube_batch5");
+            createClubMember(director.getId(), club.getId(), ClubRole.DIRECTOR);
+
+            LocalDate today = LocalDate.now(ZoneOffset.UTC);
+
+            var request = new CreateMatchBatchRequestDTO(
+                    club.getId(),
+                    DayOfWeek.TUESDAY,
+                    LocalTime.of(20, 0),
+                    today.minusDays(1),
+                    today.plusDays(14),
+                    ZoneOffset.UTC
+            );
+
+            mockMvc.perform(post("/api/matches/batch")
+                            .header("Authorization", bearerToken(director))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(request)))
+                    .andExpect(status().isBadRequest());
         }
     }
 }

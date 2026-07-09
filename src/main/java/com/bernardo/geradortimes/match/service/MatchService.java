@@ -3,6 +3,7 @@ package com.bernardo.geradortimes.match.service;
 import com.bernardo.geradortimes.club.model.ClubMember;
 import com.bernardo.geradortimes.club.repository.ClubMemberRepository;
 import com.bernardo.geradortimes.club.service.ClubAuthorizationService;
+import com.bernardo.geradortimes.match.dto.request.CreateMatchBatchRequestDTO;
 import com.bernardo.geradortimes.match.dto.request.CreateMatchRequestDTO;
 import com.bernardo.geradortimes.match.dto.request.SetMatchResultRequestDTO;
 import com.bernardo.geradortimes.match.dto.request.UpdateMatchRequestDTO;
@@ -23,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -68,6 +70,32 @@ public class MatchService {
         log.info("nova partida {} salva", saved.getId());
         return toResponse(saved);
 
+    }
+
+    public List<MatchResponseDTO> createBatch(CreateMatchBatchRequestDTO request) {
+        clubAuthorizationService.requireDirector(request.clubId());
+
+        if (request.endDate().isBefore(request.startDate())) {
+            throw new ResponseStatusException(BAD_REQUEST, "endDate must be after or equal to startDate");
+        }
+
+        List<Match> matches = new ArrayList<>();
+        LocalDate current = request.startDate();
+        while (!current.isAfter(request.endDate())) {
+            if (current.getDayOfWeek() == request.dayOfWeek()) {
+                Instant matchDateTime = current.atTime(request.time()).atZone(request.zoneId()).toInstant();
+                matches.add(Match.create(request.clubId(), matchDateTime));
+            }
+            current = current.plusDays(1);
+        }
+
+        if (matches.isEmpty()) {
+            throw new ResponseStatusException(BAD_REQUEST, "no dates found matching the selected day of week in the given range");
+        }
+
+        List<Match> saved = matchRepository.saveAll(matches);
+        log.info("{} partidas criadas em lote para o clube {}", saved.size(), request.clubId());
+        return saved.stream().map(MatchService::toResponse).toList();
     }
 
     @Transactional(readOnly = true)

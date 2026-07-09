@@ -17,6 +17,9 @@ public record GeneratedTeamDTO(
                 format = "int64",
                 nullable = true
         )
-        Long goalkeeperMemberId
+        Long goalkeeperMemberId,
+
+        @Schema(description = "Score total do time, soma dos scores normalizados de todos os membros (linha + goleiro).", example = "4.25")
+        double totalScore
 ) {
 }

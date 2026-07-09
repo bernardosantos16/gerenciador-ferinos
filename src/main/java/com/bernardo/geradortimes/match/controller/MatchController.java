@@ -1,5 +1,6 @@
 package com.bernardo.geradortimes.match.controller;
 
+import com.bernardo.geradortimes.match.dto.request.CreateMatchBatchRequestDTO;
 import com.bernardo.geradortimes.match.dto.request.CreateMatchRequestDTO;
 import com.bernardo.geradortimes.match.dto.request.SetMatchResultRequestDTO;
 import com.bernardo.geradortimes.match.dto.request.UpdateMatchRequestDTO;
@@ -59,6 +60,30 @@ public class MatchController {
         return ResponseEntity
                 .created(URI.create("/api/matches/" + created.id()))
                 .body(created);
+    }
+
+    @PostMapping("/batch")
+    @Operation(
+            summary = "Criar partidas em lote",
+            description = """
+                    Cria multiplas partidas recorrentes com base em um dia da semana.
+                    As partidas sao criadas para cada ocorrencia do dia da semana selecionado
+                    entre startDateTime e endDateTime (inclusive), mantendo o horario de startDateTime.
+                    Requer que o usuario autenticado seja DIRECTOR do clube.
+                    """
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Partidas criadas em lote.",
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = MatchResponseDTO.class)))),
+            @ApiResponse(responseCode = "400", description = "Requisicao invalida (validacao ou nenhuma data encontrada).",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "401", description = "Nao autenticado."),
+            @ApiResponse(responseCode = "403", description = "Usuario nao possui permissao (DIRECTOR requerido).",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    public ResponseEntity<List<MatchResponseDTO>> createBatch(@Valid @RequestBody CreateMatchBatchRequestDTO request) {
+        List<MatchResponseDTO> created = matchService.createBatch(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @GetMapping("/{id}")
