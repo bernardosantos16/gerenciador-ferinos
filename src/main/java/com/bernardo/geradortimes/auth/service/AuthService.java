@@ -43,7 +43,12 @@ public class AuthService {
 
     public AuthTokens login(LoginRequestDTO request) {
         User user = userRepository.findByLogin_Value(request.login().trim())
-                .orElseThrow(() -> new ResponseStatusException(UNAUTHORIZED, "invalid credentials"));
+                .orElseThrow(() -> {
+                    log.error("Tentativa de login com login inexistente - login: {}", request.login());
+                    return new ResponseStatusException(UNAUTHORIZED, "invalid credentials");
+                });
+
+
 
         boolean ok = passwordService.matches(request.password(), user.getPassword().getValue());
         if (!ok) {

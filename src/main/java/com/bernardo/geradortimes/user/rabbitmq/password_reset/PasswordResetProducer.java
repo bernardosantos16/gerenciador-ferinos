@@ -23,11 +23,7 @@ public class PasswordResetProducer {
 
     public void publish(PasswordResetEvent event) {
         log.info("Publicando evento de recuperacao de senha - userId: {}", event.userId());
-        try {
-            rabbitTemplate.convertAndSend(exchange, routingKey, event);
-            log.info("Evento de recuperacao de senha publicado com sucesso - userId: {}", event.userId());
-        } catch (Exception e) {
-            log.error("Erro ao publicar evento de recuperacao de senha - userId: {}", event.userId(), e);
-        }
+        rabbitTemplate.convertAndSend(exchange, routingKey, event);
+        log.info("Evento de recuperacao de senha publicado com sucesso - userId: {}", event.userId());
     }
 }
