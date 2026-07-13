@@ -5,6 +5,7 @@ import com.bernardo.geradortimes.auth.security.CurrentUserService;
 import com.bernardo.geradortimes.auth.security.JwtService;
 import com.bernardo.geradortimes.shared.api.FieldValidationException;
 import com.bernardo.geradortimes.shared.enums.TokenType;
+import com.bernardo.geradortimes.shared.observability.LogSanitizer;
 import com.bernardo.geradortimes.shared.security.PasswordService;
 import com.bernardo.geradortimes.shared.value_object.Email;
 import com.bernardo.geradortimes.shared.value_object.Nickname;
@@ -62,7 +63,7 @@ public class UserService {
         String loginTrimmed = login == null ? null : login.trim();
 
         if (userRepository.existsByLogin_Value(loginTrimmed)) {
-            log.warn("Tentativa de verificacao de email ja cadastrado");
+            log.warn("Verificacao de email rejeitada - email ja cadastrado - email: {}", LogSanitizer.maskEmail(loginTrimmed));
             throw new FieldValidationException(CONFLICT, "login", "email already registered");
         }
 
@@ -70,13 +71,13 @@ public class UserService {
 
         emailVerificationProducer.publish(new EmailVerificationEvent(loginTrimmed, token));
 
-        log.info("mensagem publicada para microsservico - email: {}", loginTrimmed);
+        log.info("Token de verificacao de email publicado para envio - email: {}", LogSanitizer.maskEmail(loginTrimmed));
     }
 
     public String verifyEmail(String login, String token) {
         String loginTrimmed = login == null ? null : login.trim();
         verificationTokenService.verifyEmailToken(token, loginTrimmed, true);
-        log.info("Email verificado com sucesso - email: {}, emitindo token de registro", loginTrimmed);
+        log.info("Email verificado com sucesso, emitindo token de registro - email: {}", LogSanitizer.maskEmail(loginTrimmed));
         return jwtService.issueRegistrationToken(loginTrimmed);
     }
 
@@ -91,11 +92,11 @@ public class UserService {
         }
 
         if (userRepository.existsByNickname_Value(nicknameRaw)) {
-            log.warn("Erro ao criar usuario - nickname ja utilizado");
+            log.warn("Criacao de usuario rejeitada - conflictField: nickname, conflictReason: ALREADY_EXISTS");
             throw new FieldValidationException(CONFLICT, "nickname", "nickname already exists");
         }
         if (userRepository.existsByLogin_Value(loginRaw)) {
-            log.warn("Erro ao criar usuario - login ja utilizado");
+            log.warn("Criacao de usuario rejeitada - conflictField: login, conflictReason: ALREADY_EXISTS");
             throw new FieldValidationException(CONFLICT, "login", "login already exists");
         }
 
@@ -106,6 +107,7 @@ public class UserService {
         User user = User.create(request.name(), nickname, email, passwordHash);
         user.activateUser();
         User saved = userRepository.save(user);
+        log.info("Usuario criado e ativado - userId: {}", saved.getId());
         return toResponse(saved);
     }
 
@@ -113,6 +115,7 @@ public class UserService {
     public UserResponseDTO getById(UUID id) {
         UUID currentId = currentUserService.requireUserId();
         if (!currentId.equals(id) && !currentUserService.isAdmin()) {
+            log.warn("Acesso negado a dados de usuario - currentUserId: {}, targetUserId: {}", currentId, id);
             throw new ResponseStatusException(FORBIDDEN, "forbidden");
         }
         User user = userRepository.findById(id)
@@ -139,12 +142,14 @@ public class UserService {
     public void delete(UUID id) {
         UUID currentId = currentUserService.requireUserId();
         if (!currentId.equals(id) && !currentUserService.isAdmin()) {
+            log.warn("Delecao de usuario negada - currentUserId: {}, targetUserId: {}", currentId, id);
             throw new ResponseStatusException(FORBIDDEN, "forbidden");
         }
         if (!userRepository.existsById(id)) {
             throw new ResponseStatusException(NOT_FOUND, "user not found");
         }
         userRepository.deleteById(id);
+        log.info("Usuario deletado - userId: {}, por currentUserId: {}", id, currentId);
     }
 
     public void forgotPassword(String login) {
@@ -152,7 +157,7 @@ public class UserService {
 
         User user = userRepository.findByLogin_Value(loginTrimmed).orElse(null);
         if (user == null) {
-            log.info("Tentativa de recuperacao de senha para email nao encontrado");
+            log.info("Recuperacao de senha solicitada para email nao cadastrado - email: {}", LogSanitizer.maskEmail(loginTrimmed));
             return;
         }
 

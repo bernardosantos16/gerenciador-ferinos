@@ -46,12 +46,14 @@ public class RefreshTokenService {
         String tokenHash = hashToken(token);
         Instant expiresAt = Instant.now().plus(jwtProperties.refreshTokenTtl());
         refreshTokenRepository.save(RefreshToken.issue(userId, tokenHash, expiresAt));
+        log.info("Refresh token emitido - userId: {}", userId);
         return token;
     }
 
     public String rotate(RefreshToken current) {
         current.revoke();
         refreshTokenRepository.save(current);
+        log.info("Refresh token rotacionado - userId: {}", current.getUserId());
         return issue(current.getUserId());
     }
 
@@ -68,10 +70,14 @@ public class RefreshTokenService {
             return;
         }
         String tokenHash = hashToken(refreshTokenValue);
-        refreshTokenRepository.findByToken(tokenHash).ifPresent(rt -> {
-            rt.revoke();
-            refreshTokenRepository.save(rt);
-        });
+        refreshTokenRepository.findByToken(tokenHash).ifPresentOrElse(
+                rt -> {
+                    rt.revoke();
+                    refreshTokenRepository.save(rt);
+                    log.info("Refresh token revogado - userId: {}", rt.getUserId());
+                },
+                () -> log.warn("Revogacao de refresh token ignorada - token nao encontrado")
+        );
     }
 
     private static String generateToken() {

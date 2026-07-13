@@ -6,12 +6,15 @@ import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.bernardo.geradortimes.auth.config.JwtProperties;
+import com.bernardo.geradortimes.shared.observability.LogSanitizer;
 import com.bernardo.geradortimes.user.model.User;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.Date;
 
+@Slf4j
 @Service
 public class JwtService {
 
@@ -38,7 +41,7 @@ public class JwtService {
         Instant expiresAt = now.plus(props.accessTokenTtl());
         String issuer = (props.issuer() == null || props.issuer().isBlank()) ? "geradortimes" : props.issuer();
 
-        return JWT.create()
+        String token = JWT.create()
                 .withIssuer(issuer)
                 .withSubject(user.getId().toString())
                 .withIssuedAt(Date.from(now))
@@ -48,6 +51,8 @@ public class JwtService {
                 .withClaim("role", user.getRole().name())
                 .withClaim("status", user.getStatus().name())
                 .sign(algorithm);
+        log.debug("Access token emitido - userId: {}", user.getId());
+        return token;
     }
 
     public DecodedJWT verify(String token) throws JWTVerificationException {
@@ -59,7 +64,7 @@ public class JwtService {
         Instant expiresAt = now.plus(props.registrationTokenTtl());
         String issuer = (props.issuer() == null || props.issuer().isBlank()) ? "geradortimes" : props.issuer();
 
-        return JWT.create()
+        String token = JWT.create()
                 .withIssuer(issuer)
                 .withSubject(email)
                 .withClaim("email", email)
@@ -67,16 +72,20 @@ public class JwtService {
                 .withIssuedAt(Date.from(now))
                 .withExpiresAt(Date.from(expiresAt))
                 .sign(algorithm);
+        log.debug("Token de registro emitido - email: {}", LogSanitizer.maskEmail(email));
+        return token;
     }
 
     public String verifyRegistrationToken(String token) throws JWTVerificationException {
         DecodedJWT jwt = verifier.verify(token);
         String purpose = jwt.getClaim("purpose").asString();
         if (!"registration".equals(purpose)) {
+            log.warn("Token de registro rejeitado - failureReason: INVALID_PURPOSE");
             throw new JWTVerificationException("Invalid token purpose");
         }
         String email = jwt.getClaim("email").asString();
         if (email == null || email.isBlank()) {
+            log.warn("Token de registro rejeitado - failureReason: MISSING_EMAIL_CLAIM");
             throw new JWTVerificationException("Missing email claim in registration token");
         }
         return email;

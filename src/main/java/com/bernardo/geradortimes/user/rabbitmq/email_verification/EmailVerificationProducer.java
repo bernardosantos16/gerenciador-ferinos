@@ -1,5 +1,6 @@
 package com.bernardo.geradortimes.user.rabbitmq.email_verification;
 
+import com.bernardo.geradortimes.shared.observability.LogSanitizer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,8 +23,8 @@ public class EmailVerificationProducer {
     }
 
     public void publish(EmailVerificationEvent event) {
-        log.info("Publicando evento de verificacao de email - email: {}", event.email());
+        log.info("Publicando evento de verificacao de email - email: {}", LogSanitizer.maskEmail(event.email()));
         rabbitTemplate.convertAndSend(exchange, routingKey, event);
-        log.info("Evento de verificacao de email publicado com sucesso - email: {}", event.email());
+        log.info("Evento de verificacao de email publicado com sucesso - email: {}", LogSanitizer.maskEmail(event.email()));
     }
 }

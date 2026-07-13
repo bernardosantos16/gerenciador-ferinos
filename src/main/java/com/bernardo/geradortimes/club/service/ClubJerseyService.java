@@ -6,6 +6,7 @@ import com.bernardo.geradortimes.club.dto.response.ClubJerseyResponseDTO;
 import com.bernardo.geradortimes.club.model.ClubJersey;
 import com.bernardo.geradortimes.club.repository.ClubJerseyRepository;
 import com.bernardo.geradortimes.shared.value_object.HexColor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -17,6 +18,7 @@ import java.util.UUID;
 
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
+@Slf4j
 @Service
 @Transactional
 public class ClubJerseyService {
@@ -38,6 +40,7 @@ public class ClubJerseyService {
                 clubId
         );
         ClubJersey saved = clubJerseyRepository.save(clubJersey);
+        log.info("Camisa adicionada ao clube - jerseyId: {}, clubId: {}", saved.getId(), clubId);
         return toResponse(saved);
     }
 
@@ -64,6 +67,7 @@ public class ClubJerseyService {
             throw new ResponseStatusException(NOT_FOUND, "jersey not found");
         }
         clubJerseyRepository.delete(jersey);
+        log.info("Camisa removida do clube - jerseyId: {}, clubId: {}", jerseyId, clubId);
     }
 
     public ClubJerseyResponseDTO updateJersey(UUID clubId, Long jerseyId, UpdateJerseyRequestDTO request) {
@@ -85,6 +89,7 @@ public class ClubJerseyService {
         }
 
         ClubJersey saved = clubJerseyRepository.save(jersey);
+        log.info("Camisa atualizada - jerseyId: {}, clubId: {}", saved.getId(), clubId);
         return toResponse(saved);
     }
 

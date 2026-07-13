@@ -137,6 +137,7 @@ public class MatchService {
 
         match.updateDateTime(request.dateTime());
         Match saved = matchRepository.save(match);
+        log.info("partida atualizada - matchId: {}", saved.getId());
         return toResponse(saved);
     }
 
@@ -196,7 +197,7 @@ public class MatchService {
 
         matchRepository.delete(match);
 
-        log.info("partida deletada");
+        log.info("partida deletada - matchId: {}", id);
     }
 
     @Transactional(readOnly = true)

@@ -55,7 +55,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
     @Scheduled(fixedRate = 300_000)
     public void cleanStaleEntries() {
         long cutoff = System.currentTimeMillis() - (windowSeconds * 1000);
+        int before = counters.size();
         counters.entrySet().removeIf(e -> e.getValue().windowStart < cutoff);
+        log.debug("Limpeza de contadores de rate limit executada - antes: {}, depois: {}", before, counters.size());
     }
 
     @Override

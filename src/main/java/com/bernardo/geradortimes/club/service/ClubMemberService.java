@@ -45,6 +45,7 @@ public class ClubMemberService {
                 ClubRole.DIRECTOR
         );
         clubMemberRepository.save(clubMember);
+        log.info("Membro diretor criado - clubId: {}, userId: {}", clubId, userId);
     }
 
 
@@ -61,6 +62,7 @@ public class ClubMemberService {
                 ClubRole.MEMBER
         );
         clubMemberRepository.save(clubMember);
+        log.info("Membro sem usuario adicionado ao clube - memberId: {}, clubId: {}", clubMember.getId(), clubId);
         return toResponse(clubMember);
     }
 
@@ -116,7 +118,8 @@ public class ClubMemberService {
         }
 
         ClubMember saved = clubMemberRepository.save(member);
-        log.info("Membro atualizado - memberId: {}, clubId: {}, changes: {}", memberId, clubId, request);
+        log.info("Membro atualizado - memberId: {}, clubId: {}, roleChanged: {}, ratingChanged: {}",
+                memberId, clubId, request.clubRole() != null, request.rating() != null);
         return toResponse(saved);
     }
 
@@ -128,6 +131,7 @@ public class ClubMemberService {
             throw new ResponseStatusException(NOT_FOUND, "member not found");
         }
         clubMemberRepository.delete(member);
+        log.info("Membro removido do clube - memberId: {}, clubId: {}", memberId, clubId);
     }
 
     private static ClubMemberResponseDTO toResponse(ClubMember member) {

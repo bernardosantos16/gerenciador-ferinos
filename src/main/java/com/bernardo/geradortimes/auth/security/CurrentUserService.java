@@ -18,7 +18,7 @@ public class CurrentUserService {
     public UUID requireUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {
-            log.error("Não autorizado, não autenticado");
+            log.warn("Acesso nao autorizado - requisicao sem autenticacao");
             throw new ResponseStatusException(UNAUTHORIZED, "unauthorized");
         }
 
@@ -26,7 +26,7 @@ public class CurrentUserService {
         if (principal instanceof UserPrincipal userPrincipal) {
             return userPrincipal.id();
         }
-        log.error("Não autorizado, autenticação não aponta usuário");
+        log.warn("Acesso nao autorizado - autenticacao nao aponta um usuario valido");
         throw new ResponseStatusException(UNAUTHORIZED, "unauthorized");
     }
 

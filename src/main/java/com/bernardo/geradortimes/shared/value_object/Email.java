@@ -25,13 +25,13 @@ public class Email {
 
     public static Email of(String value) {
         if (value == null || value.isBlank()) {
-            log.error("Email enviado em branco");
+            log.debug("Validacao de email falhou - valor em branco");
             throw new FieldValidationException(BAD_REQUEST, "login", "login is required");
         }
 
         String normalized = value.trim();
         if (normalized.length() > 100) {
-            log.error("Email enviado com mais de 100 caracteres");
+            log.debug("Validacao de email falhou - excede 100 caracteres");
             throw new FieldValidationException(BAD_REQUEST, "login", "login must have at most 100 characters");
         }
 

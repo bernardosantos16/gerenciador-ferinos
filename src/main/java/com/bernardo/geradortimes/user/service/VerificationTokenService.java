@@ -1,6 +1,7 @@
 package com.bernardo.geradortimes.user.service;
 
 import com.bernardo.geradortimes.shared.enums.TokenType;
+import com.bernardo.geradortimes.shared.observability.LogSanitizer;
 import com.bernardo.geradortimes.user.model.VerificationToken;
 import com.bernardo.geradortimes.user.repository.VerificationTokenRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -50,7 +51,7 @@ public class VerificationTokenService {
                         verificationToken -> {
                             verificationToken.setTokenHash(tokenHash);
                             verificationToken.setExpiresAt(expiresAt);
-                            log.info("Token de verificacao de email atualizado - email: {}", email);
+                            log.info("Token de verificacao de email atualizado - email: {}", LogSanitizer.maskEmail(email));
                         },
                         () -> {
                             VerificationToken verificationToken = VerificationToken.create(
@@ -60,7 +61,7 @@ public class VerificationTokenService {
                                     email
                             );
                             verificationTokenRepository.save(verificationToken);
-                            log.info("Token de verificacao de email gerado - email: {}", email);
+                            log.info("Token de verificacao de email gerado - email: {}", LogSanitizer.maskEmail(email));
                         }
                 );
         return token;
@@ -75,12 +76,17 @@ public class VerificationTokenService {
 
         VerificationToken vt = verificationTokenRepository
                 .findByTokenHashAndTypeAndEmail(tokenHash, TokenType.EMAIL_VERIFICATION, email)
-                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "invalid or expired verification token"));
+                .orElseThrow(() -> {
+                    log.warn("Token de verificacao de email invalido - email: {}", LogSanitizer.maskEmail(email));
+                    return new ResponseStatusException(NOT_FOUND, "invalid or expired verification token");
+                });
 
         if (vt.isExpired()) {
+            log.warn("Token de verificacao de email expirado - email: {}", LogSanitizer.maskEmail(email));
             throw new ResponseStatusException(UNAUTHORIZED, "verification token expired");
         }
         if (vt.isUsed()) {
+            log.warn("Token de verificacao de email ja utilizado - email: {}", LogSanitizer.maskEmail(email));
             throw new ResponseStatusException(UNAUTHORIZED, "verification token already used");
         }
         if (consume) {
@@ -102,7 +108,7 @@ public class VerificationTokenService {
         VerificationToken vt = VerificationToken.create(tokenHash, TokenType.PASSWORD_RESET, expiresAt, email);
         verificationTokenRepository.save(vt);
 
-        log.info("Token de recuperacao de senha gerado - email: {}", email);
+        log.info("Token de recuperacao de senha gerado - email: {}", LogSanitizer.maskEmail(email));
         return token;
     }
 
@@ -115,19 +121,24 @@ public class VerificationTokenService {
 
         VerificationToken vt = verificationTokenRepository
                 .findByTokenHashAndTypeAndEmail(tokenHash, TokenType.PASSWORD_RESET, email)
-                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "invalid or expired verification token"));
+                .orElseThrow(() -> {
+                    log.warn("Token de recuperacao de senha invalido - email: {}", LogSanitizer.maskEmail(email));
+                    return new ResponseStatusException(NOT_FOUND, "invalid or expired verification token");
+                });
 
         if (vt.isExpired()) {
+            log.warn("Token de recuperacao de senha expirado - email: {}", LogSanitizer.maskEmail(email));
             throw new ResponseStatusException(UNAUTHORIZED, "verification token expired");
         }
         if (vt.isUsed()) {
+            log.warn("Token de recuperacao de senha ja utilizado - email: {}", LogSanitizer.maskEmail(email));
             throw new ResponseStatusException(UNAUTHORIZED, "verification token already used");
         }
 
         vt.markUsed();
         verificationTokenRepository.save(vt);
 
-        log.info("Token de recuperacao de senha consumido - email: {}", email);
+        log.info("Token de recuperacao de senha consumido - email: {}", LogSanitizer.maskEmail(email));
     }
 
     /**

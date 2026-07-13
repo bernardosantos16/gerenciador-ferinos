@@ -77,6 +77,7 @@ public class TeamService {
         validateJersey(match.getClubId(), request.clubJerseyId());
         Team team = Team.create(request.matchId(), request.clubJerseyId());
         Team saved = teamRepository.save(team);
+        log.info("time criado - teamId: {}, matchId: {}", saved.getId(), request.matchId());
         return toResponse(saved);
     }
 
@@ -121,6 +122,7 @@ public class TeamService {
         team.changeJersey(request.clubJerseyId());
 
         Team saved = teamRepository.save(team);
+        log.info("time atualizado - teamId: {}, matchId: {}", saved.getId(), team.getMatchId());
         return toResponse(saved);
     }
 
@@ -281,6 +283,7 @@ public class TeamService {
         List<PlayerSwapDTO> swaps = request.swaps();
 
         if (swaps == null || swaps.isEmpty()) {
+            log.warn("Troca de jogadores rejeitada - lista de swaps vazia - matchId: {}", matchId);
             throw new ResponseStatusException(BAD_REQUEST, "swaps list cannot be empty");
         }
 
@@ -292,12 +295,14 @@ public class TeamService {
         // Validate that teams have been generated for this match
         List<Team> teams = teamRepository.findByMatchId(matchId);
         if (teams.isEmpty()) {
+            log.warn("Troca de jogadores rejeitada - times ainda nao gerados - matchId: {}", matchId);
             throw new ResponseStatusException(BAD_REQUEST, "teams must be generated before swapping players");
         }
 
         // Get all participants for this match
         List<MatchParticipant> allParticipants = matchParticipantRepository.findByMatchId(matchId);
         if (allParticipants.isEmpty()) {
+            log.warn("Troca de jogadores rejeitada - sem participantes na partida - matchId: {}", matchId);
             throw new ResponseStatusException(BAD_REQUEST, "no participants found for this match");
         }
 
@@ -317,6 +322,7 @@ public class TeamService {
         // Validate that all members are participants in this match
         for (Long memberId : memberIds) {
             if (!participantsByMemberId.containsKey(memberId)) {
+                log.warn("Troca de jogadores rejeitada - membro nao e participante - matchId: {}, memberId: {}", matchId, memberId);
                 throw new ResponseStatusException(BAD_REQUEST, "member " + memberId + " is not a participant in this match");
             }
         }
@@ -328,17 +334,23 @@ public class TeamService {
 
             // Validate that both players belong to different teams
             if (p1.getTeamId() == null || p2.getTeamId() == null) {
+                log.warn("Troca de jogadores rejeitada - jogador sem time - matchId: {}, memberIdFrom: {}, memberIdTo: {}",
+                        matchId, swap.memberIdFrom(), swap.memberIdTo());
                 throw new ResponseStatusException(BAD_REQUEST,
                         "cannot swap unassigned players (members with no team)");
             }
 
             if (p1.getTeamId().equals(p2.getTeamId())) {
+                log.warn("Troca de jogadores rejeitada - jogadores no mesmo time - matchId: {}, teamId: {}",
+                        matchId, p1.getTeamId());
                 throw new ResponseStatusException(BAD_REQUEST,
                         "cannot swap players from the same team");
             }
 
             // Validate that positions match (goalkeeper can only swap with goalkeeper)
             if (!p1.getPosition().equals(p2.getPosition())) {
+                log.warn("Troca de jogadores rejeitada - posicoes incompativeis - matchId: {}, positionFrom: {}, positionTo: {}",
+                        matchId, p1.getPosition(), p2.getPosition());
                 throw new ResponseStatusException(BAD_REQUEST,
                         "can only swap players with the same position (LINE with LINE, GOAL with GOAL)");
             }
@@ -368,6 +380,7 @@ public class TeamService {
         clubAuthorizationService.requireDirector(match.getClubId());
         ensureMatchResultNotSet(match);
         teamRepository.delete(team);
+        log.info("time deletado - teamId: {}, matchId: {}", id, team.getMatchId());
     }
 
     private void recalculateTeamScores(UUID matchId) {

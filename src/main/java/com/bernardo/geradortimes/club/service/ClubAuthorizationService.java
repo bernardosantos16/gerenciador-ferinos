@@ -3,6 +3,7 @@ package com.bernardo.geradortimes.club.service;
 import com.bernardo.geradortimes.auth.security.CurrentUserService;
 import com.bernardo.geradortimes.club.repository.ClubMemberRepository;
 import com.bernardo.geradortimes.shared.enums.ClubRole;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -11,6 +12,7 @@ import java.util.UUID;
 
 import static org.springframework.http.HttpStatus.FORBIDDEN;
 
+@Slf4j
 @Service
 @Transactional(readOnly = true)
 public class ClubAuthorizationService {
@@ -27,6 +29,8 @@ public class ClubAuthorizationService {
         UUID userId = currentUserService.requireUserId();
         boolean isMember = clubMemberRepository.existsByClubIdAndUserId(clubId, userId);
         if (!isMember) {
+            log.warn("Autorizacao negada - usuario nao e membro do clube - userId: {}, clubId: {}, requiredRole: MEMBER",
+                    userId, clubId);
             throw new ResponseStatusException(FORBIDDEN, "not a club member");
         }
     }
@@ -35,6 +39,8 @@ public class ClubAuthorizationService {
         UUID userId = currentUserService.requireUserId();
         boolean isDirector = clubMemberRepository.existsByClubIdAndUserIdAndClubRole(clubId, userId, ClubRole.DIRECTOR);
         if (!isDirector) {
+            log.warn("Autorizacao negada - usuario nao e diretor do clube - userId: {}, clubId: {}, requiredRole: DIRECTOR",
+                    userId, clubId);
             throw new ResponseStatusException(FORBIDDEN, "director role required");
         }
     }

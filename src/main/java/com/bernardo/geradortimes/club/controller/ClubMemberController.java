@@ -121,7 +121,7 @@ public class ClubMemberController {
             @PathVariable Long memberId,
             @Valid @RequestBody UpdateClubMemberRequestDTO request
     ) {
-        log.info("Atualizando membro {} do clube {}: {}", memberId, clubId, request);
+        log.info("Atualizando membro {} do clube {}", memberId, clubId);
         return ResponseEntity.ok(clubMemberService.updateMember(clubId, memberId, request));
     }
 

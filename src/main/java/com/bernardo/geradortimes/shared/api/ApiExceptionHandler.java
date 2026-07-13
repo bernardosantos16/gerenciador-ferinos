@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -25,6 +27,8 @@ import java.util.List;
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class ApiExceptionHandler {
 
+    private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ProblemDetail handleMethodArgumentNotValid(MethodArgumentNotValidException ex, HttpServletRequest request) {
         ProblemDetail pd = buildValidationProblemDetail(request);
@@ -36,6 +40,8 @@ public class ApiExceptionHandler {
                 .map(error -> new ValidationError("global", error.getDefaultMessage()))
                 .toList());
         pd.setProperty("errors", toFieldErrors(errors));
+        log.debug("Validacao de entrada falhou - errorType: METHOD_ARGUMENT_NOT_VALID, fieldCount: {}, path: {}",
+                errors.size(), request.getRequestURI());
         return pd;
     }
 
@@ -46,6 +52,8 @@ public class ApiExceptionHandler {
                 .map(ApiExceptionHandler::toValidationError)
                 .toList();
         pd.setProperty("errors", toFieldErrors(errors));
+        log.debug("Validacao de entrada falhou - errorType: CONSTRAINT_VIOLATION, fieldCount: {}, path: {}",
+                errors.size(), request.getRequestURI());
         return pd;
     }
 
@@ -56,6 +64,8 @@ public class ApiExceptionHandler {
                 ? "invalid value"
                 : "invalid value for type " + ex.getRequiredType().getSimpleName();
         pd.setProperty("errors", List.of(new FieldErrorResponse(ex.getName(), message)));
+        log.debug("Validacao de entrada falhou - errorType: TYPE_MISMATCH, field: {}, path: {}",
+                ex.getName(), request.getRequestURI());
         return pd;
     }
 
@@ -63,6 +73,8 @@ public class ApiExceptionHandler {
     public ProblemDetail handleMissingServletRequestParameter(MissingServletRequestParameterException ex, HttpServletRequest request) {
         ProblemDetail pd = buildValidationProblemDetail(request);
         pd.setProperty("errors", List.of(new FieldErrorResponse(ex.getParameterName(), "parameter is required")));
+        log.debug("Validacao de entrada falhou - errorType: MISSING_PARAMETER, parameter: {}, path: {}",
+                ex.getParameterName(), request.getRequestURI());
         return pd;
     }
 
@@ -74,15 +86,20 @@ public class ApiExceptionHandler {
         if (cause instanceof InvalidFormatException invalidFormat) {
             String field = extractJsonField(invalidFormat.getPath());
             pd.setProperty("errors", List.of(new FieldErrorResponse(field, "invalid value")));
+            log.debug("Corpo da requisicao invalido - errorType: INVALID_FORMAT, field: {}, path: {}",
+                    field, request.getRequestURI());
             return pd;
         }
         if (cause instanceof MismatchedInputException mismatchedInput) {
             String field = extractJsonField(mismatchedInput.getPath());
             pd.setProperty("errors", List.of(new FieldErrorResponse(field, "invalid value")));
+            log.debug("Corpo da requisicao invalido - errorType: MISMATCHED_INPUT, field: {}, path: {}",
+                    field, request.getRequestURI());
             return pd;
         }
 
         pd.setProperty("errors", List.of(new FieldErrorResponse("body", "invalid request body")));
+        log.debug("Corpo da requisicao invalido - errorType: UNREADABLE_BODY, path: {}", request.getRequestURI());
         return pd;
     }
 
@@ -94,6 +111,13 @@ public class ApiExceptionHandler {
             pd.setDetail(ex.getMessage());
         }
         pd.setProperty("errors", List.of(new FieldErrorResponse(ex.getField(), ex.getMessage())));
+        if (ex.getStatus() == HttpStatus.CONFLICT) {
+            log.warn("Requisicao rejeitada por conflito - status: {}, field: {}, path: {}",
+                    ex.getStatus(), ex.getField(), request.getRequestURI());
+        } else {
+            log.debug("Requisicao rejeitada por regra de negocio - status: {}, field: {}, path: {}",
+                    ex.getStatus(), ex.getField(), request.getRequestURI());
+        }
         return pd;
     }
 
@@ -110,6 +134,32 @@ public class ApiExceptionHandler {
         }
         String field = mapKnownField(message);
         pd.setProperty("errors", List.of(new FieldErrorResponse(field, message)));
+        int status = ex.getStatusCode().value();
+        if (ex.getStatusCode().is5xxServerError()) {
+            log.error("Erro ao processar requisicao - status: {}, path: {}, reason: {}",
+                    status, request.getRequestURI(), message, ex);
+        } else if (status == HttpStatus.UNAUTHORIZED.value()
+                || status == HttpStatus.FORBIDDEN.value()
+                || status == HttpStatus.CONFLICT.value()) {
+            log.warn("Requisicao rejeitada - status: {}, path: {}, reason: {}",
+                    status, request.getRequestURI(), message);
+        } else {
+            log.debug("Requisicao rejeitada - status: {}, path: {}, reason: {}",
+                    status, request.getRequestURI(), message);
+        }
+        return pd;
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ProblemDetail handleUnexpected(Exception ex, HttpServletRequest request) throws Exception {
+        if (ex instanceof org.springframework.security.access.AccessDeniedException
+                || ex instanceof org.springframework.security.core.AuthenticationException) {
+            throw ex;
+        }
+        ProblemDetail pd = ProblemDetail.forStatus(HttpStatus.INTERNAL_SERVER_ERROR);
+        pd.setInstance(java.net.URI.create(request.getRequestURI()));
+        pd.setDetail("Unexpected error");
+        log.error("Erro inesperado ao processar requisicao - path: {}", request.getRequestURI(), ex);
         return pd;
     }
 

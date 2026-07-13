@@ -8,6 +8,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -18,6 +19,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.UUID;
 
+@Slf4j
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
@@ -33,6 +35,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String header = request.getHeader(HttpHeaders.AUTHORIZATION);
         if (header == null || !header.startsWith("Bearer ")) {
+            log.debug("Requisicao sem token Bearer - seguindo sem autenticacao");
             filterChain.doFilter(request, response);
             return;
         }
@@ -49,6 +52,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             ActivityStatus status = statusValue == null ? ActivityStatus.ACTIVE : ActivityStatus.valueOf(statusValue);
 
             if (status != ActivityStatus.ACTIVE) {
+                log.warn("Acesso negado - usuario nao ativo - userId: {}, currentStatus: {}, requiredStatus: {}",
+                        userId, status, ActivityStatus.ACTIVE);
                 response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                 return;
             }
@@ -59,9 +64,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
+            log.debug("Requisicao autenticada via JWT - userId: {}", userId);
             filterChain.doFilter(request, response);
         } catch (JWTVerificationException | IllegalArgumentException e) {
             SecurityContextHolder.clearContext();
+            log.warn("Autenticacao JWT falhou - failureReason: {}", e.getClass().getSimpleName());
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         }
     }

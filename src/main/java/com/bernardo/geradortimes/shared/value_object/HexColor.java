@@ -4,11 +4,13 @@ import com.bernardo.geradortimes.shared.api.FieldValidationException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.Locale;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 
+@Slf4j
 @Getter
 @Embeddable
 public class HexColor {
@@ -25,6 +27,7 @@ public class HexColor {
 
     public static HexColor of(String value) {
         if (value == null || value.isBlank()) {
+            log.debug("Validacao de hexColor falhou - valor em branco");
             throw new FieldValidationException(BAD_REQUEST, "hexColor", "hexColor is required");
         }
 
@@ -34,6 +37,7 @@ public class HexColor {
         }
 
         if (raw.length() != 6) {
+            log.debug("Validacao de hexColor falhou - tamanho invalido - rejectedValue: {}", value);
             throw new FieldValidationException(BAD_REQUEST, "hexColor", "hexColor must have exactly 6 hex digits");
         }
 
@@ -43,6 +47,7 @@ public class HexColor {
                     || (c >= 'a' && c <= 'f')
                     || (c >= 'A' && c <= 'F');
             if (!isHex) {
+                log.debug("Validacao de hexColor falhou - caractere invalido - rejectedValue: {}", value);
                 throw new FieldValidationException(BAD_REQUEST, "hexColor", "hexColor must contain only hex digits");
             }
         }

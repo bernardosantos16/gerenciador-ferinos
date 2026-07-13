@@ -12,6 +12,7 @@ import com.bernardo.geradortimes.shared.enums.ClubRole;
 import com.bernardo.geradortimes.shared.value_object.Nickname;
 import com.bernardo.geradortimes.user.model.User;
 import com.bernardo.geradortimes.user.repository.UserRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -22,6 +23,7 @@ import java.util.UUID;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 
+@Slf4j
 @Service
 @Transactional
 public class ClubService {
@@ -69,6 +71,7 @@ public class ClubService {
 
         // The creator is always a DIRECTOR in the club.
         clubMemberService.createDirectorMember(userId, saved.getId(), user.getName());
+        log.info("Clube criado - clubId: {}, userId: {}", saved.getId(), userId);
         return new ClubResponseDTO(saved.getId(), saved.getName(), saved.getNickname().getValue());
     }
 
@@ -102,6 +105,7 @@ public class ClubService {
         }
 
         Club saved = clubRepository.save(club);
+        log.info("Clube atualizado - clubId: {}", saved.getId());
         return new ClubResponseDTO(saved.getId(), saved.getName(), saved.getNickname().getValue());
     }
 
@@ -114,6 +118,7 @@ public class ClubService {
 
         club.deactivate();
         clubRepository.save(club);
+        log.info("Clube desativado (soft-delete) - clubId: {}", club.getId());
         return new ClubResponseDTO(club.getId(), club.getName(), club.getNickname().getValue());
     }
 
