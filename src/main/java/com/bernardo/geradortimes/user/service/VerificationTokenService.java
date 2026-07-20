@@ -75,7 +75,7 @@ public class VerificationTokenService {
         String tokenHash = sha256(token);
 
         VerificationToken vt = verificationTokenRepository
-                .findByTokenHashAndTypeAndEmail(tokenHash, TokenType.EMAIL_VERIFICATION, email)
+                .findByTokenHashAndTypeAndEmailForUpdate(tokenHash, TokenType.EMAIL_VERIFICATION, email)
                 .orElseThrow(() -> {
                     log.warn("Token de verificacao de email invalido - email: {}", LogSanitizer.maskEmail(email));
                     return new ResponseStatusException(NOT_FOUND, "invalid or expired verification token");
@@ -120,7 +120,7 @@ public class VerificationTokenService {
         String tokenHash = sha256(token);
 
         VerificationToken vt = verificationTokenRepository
-                .findByTokenHashAndTypeAndEmail(tokenHash, TokenType.PASSWORD_RESET, email)
+                .findByTokenHashAndTypeAndEmailForUpdate(tokenHash, TokenType.PASSWORD_RESET, email)
                 .orElseThrow(() -> {
                     log.warn("Token de recuperacao de senha invalido - email: {}", LogSanitizer.maskEmail(email));
                     return new ResponseStatusException(NOT_FOUND, "invalid or expired verification token");

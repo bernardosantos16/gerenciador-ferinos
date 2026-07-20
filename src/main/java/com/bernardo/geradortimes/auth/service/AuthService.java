@@ -43,26 +43,28 @@ public class AuthService {
     }
 
     public AuthTokens login(LoginRequestDTO request) {
-        User user = userRepository.findByLogin_Value(request.login().trim())
-                .orElseThrow(() -> {
-                    log.warn("Login falhou - credencial inexistente - login: {}", LogSanitizer.maskEmail(request.login()));
-                    return new ResponseStatusException(UNAUTHORIZED, "invalid credentials");
-                });
+        String loginTrimmed = request.login().trim();
+        User user = userRepository.findByLogin_Value(loginTrimmed).orElse(null);
 
-
+        if (user == null) {
+            // Timing defense: run Argon2 hash even for unknown users
+            // so that response time is indistinguishable from valid-user/wrong-password.
+            passwordService.hash("dummy-timing-defense");
+            log.warn("Login falhou - credencial inexistente - login: {}", LogSanitizer.maskEmail(loginTrimmed));
+            throw invalidCredentials();
+        }
 
         boolean ok = passwordService.matches(request.password(), user.getPassword().getValue());
         if (!ok) {
             log.warn("Login falhou - senha invalida - userId: {}", user.getId());
-            throw new ResponseStatusException(UNAUTHORIZED, "invalid credentials");
+            throw invalidCredentials();
         }
 
         ActivityStatus status = user.getStatus();
         if (status.isInvalid()) {
             log.warn("Login bloqueado - usuario com status {} - userId: {}", status, user.getId());
-            throw new ResponseStatusException(UNAUTHORIZED, status.getErrorMessage());
+            throw invalidCredentials();
         }
-
 
         String accessToken = jwtService.issueAccessToken(user);
         String refreshToken = refreshTokenService.issue(user.getId());
@@ -73,6 +75,10 @@ public class AuthService {
                 refreshToken,
                 jwtProperties.accessTokenTtl().toSeconds()
         );
+    }
+
+    private static ResponseStatusException invalidCredentials() {
+        return new ResponseStatusException(UNAUTHORIZED, "invalid credentials");
     }
 
     public AuthTokens refresh(RefreshTokenRequestDTO request) {

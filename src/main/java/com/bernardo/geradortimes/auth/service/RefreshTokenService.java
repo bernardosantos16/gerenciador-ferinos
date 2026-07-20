@@ -62,7 +62,7 @@ public class RefreshTokenService {
             return Optional.empty();
         }
         String tokenHash = hashToken(refreshTokenValue);
-        return refreshTokenRepository.findByToken(tokenHash);
+        return refreshTokenRepository.findByTokenForUpdate(tokenHash);
     }
 
     public void revokeByTokenValue(String refreshTokenValue) {
@@ -70,7 +70,7 @@ public class RefreshTokenService {
             return;
         }
         String tokenHash = hashToken(refreshTokenValue);
-        refreshTokenRepository.findByToken(tokenHash).ifPresentOrElse(
+        refreshTokenRepository.findByTokenForUpdate(tokenHash).ifPresentOrElse(
                 rt -> {
                     rt.revoke();
                     refreshTokenRepository.save(rt);

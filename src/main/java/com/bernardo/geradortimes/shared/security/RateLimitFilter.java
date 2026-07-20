@@ -14,10 +14,12 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Rate limit por IP para endpoints sensiveis (ex: envio de email).
+ * Rate limit por IP para endpoints sensiveis (login, registro, envio/verificacao de
+ * email, recuperacao/redefinicao de senha).
  * <p>
  * Janela deslizante simples: cada IP pode fazer ate {@code maxRequests} requisicoes
  * dentro de {@code windowSeconds}. Ao estourar, retorna HTTP 429.
@@ -25,6 +27,15 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 @Component
 public class RateLimitFilter extends OncePerRequestFilter {
+
+    private static final Set<String> PROTECTED_URIS = Set.of(
+            "/api/auth/login",
+            "/api/users",
+            "/api/users/email",
+            "/api/users/verify-email",
+            "/api/users/forgot-password",
+            "/api/users/reset-password"
+    );
 
     private final Map<String, Entry> counters = new ConcurrentHashMap<>();
 
@@ -38,7 +49,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     private boolean shouldRateLimit(HttpServletRequest request) {
         return "POST".equalsIgnoreCase(request.getMethod())
-                && request.getRequestURI().equals("/api/users/email");
+                && PROTECTED_URIS.contains(request.getRequestURI());
     }
 
     private String getClientIp(HttpServletRequest request) {
