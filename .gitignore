@@ -3,6 +3,7 @@
 AGENTS-CONTEXT.md
 graphify-out/
 .opencode/
+.opencodeignore
 .codex
 
 HELP.md
