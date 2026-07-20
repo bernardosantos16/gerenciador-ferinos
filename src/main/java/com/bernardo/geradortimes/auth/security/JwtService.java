@@ -46,8 +46,6 @@ public class JwtService {
                 .withSubject(user.getId().toString())
                 .withIssuedAt(Date.from(now))
                 .withExpiresAt(Date.from(expiresAt))
-                .withClaim("login", user.getLogin().getValue())
-                .withClaim("nickname", user.getNickname().getValue())
                 .withClaim("role", user.getRole().name())
                 .withClaim("status", user.getStatus().name())
                 .sign(algorithm);

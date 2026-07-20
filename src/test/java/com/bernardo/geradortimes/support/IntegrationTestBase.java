@@ -123,17 +123,17 @@ public abstract class IntegrationTestBase {
      * Generates a valid Bearer JWT for the given user.
      */
     protected String bearerToken(User user) {
-        return "Bearer " + generateJwt(user.getId(), user.getLogin().getValue(), user.getRole());
+        return "Bearer " + generateJwt(user.getId(), user.getRole());
     }
 
     /**
      * Generates a valid Bearer JWT for the given parameters.
      */
     protected String bearerToken(UUID userId, String login, UserRole role) {
-        return "Bearer " + generateJwt(userId, login, role);
+        return "Bearer " + generateJwt(userId, role);
     }
 
-    private String generateJwt(UUID userId, String login, UserRole role) {
+    private String generateJwt(UUID userId, UserRole role) {
         Algorithm algorithm = Algorithm.HMAC256(JWT_SECRET);
         Instant now = Instant.now();
         return JWT.create()
@@ -141,8 +141,6 @@ public abstract class IntegrationTestBase {
                 .withSubject(userId.toString())
                 .withIssuedAt(Date.from(now))
                 .withExpiresAt(Date.from(now.plusSeconds(JWT_TTL_SEC)))
-                .withClaim("login", login)
-                .withClaim("nickname", login)
                 .withClaim("role", role.name())
                 .sign(algorithm);
     }

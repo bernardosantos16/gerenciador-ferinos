@@ -51,6 +51,10 @@ public class SecurityConfig {
                 ))
                 .headers(headers -> headers
                         .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src 'self' data:; font-src 'self'; frame-ancestors 'none';"))
+                        .httpStrictTransportSecurity(hsts -> hsts
+                                .includeSubDomains(true)
+                                .maxAgeInSeconds(31536000))
+                        .contentTypeOptions(Customizer.withDefaults())
                 )
                 .authorizeHttpRequests(auth -> auth
                         // Swagger / OpenAPI
@@ -83,7 +87,7 @@ public class SecurityConfig {
 
         ));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")); // Allowed HTTP methods
-        configuration.setAllowedHeaders(List.of("*")); // Allow all headers
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Request-Id"));
         configuration.setExposedHeaders(List.of("Location", "X-Request-Id"));
         configuration.setAllowCredentials(true); // Allow sending cookies and other credentials
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

@@ -45,7 +45,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             DecodedJWT jwt = jwtService.verify(token);
 
             UUID userId = UUID.fromString(jwt.getSubject());
-            String login = jwt.getClaim("login").asString();
             String roleValue = jwt.getClaim("role").asString();
             UserRole role = roleValue == null ? UserRole.USER : UserRole.valueOf(roleValue);
             String statusValue = jwt.getClaim("status").asString();
@@ -58,7 +57,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 return;
             }
 
-            UserPrincipal principal = new UserPrincipal(userId, login, role, status);
+            UserPrincipal principal = new UserPrincipal(userId, userId.toString(), role, status);
 
             UsernamePasswordAuthenticationToken authentication =
                     new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
