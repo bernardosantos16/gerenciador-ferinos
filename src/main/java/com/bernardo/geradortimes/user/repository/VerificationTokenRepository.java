@@ -27,6 +27,16 @@ public interface VerificationTokenRepository extends JpaRepository<VerificationT
         """)
     Optional<VerificationToken> findActiveByEmailAndType(String email, TokenType type, Instant now);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        SELECT v FROM VerificationToken v
+        WHERE v.email = :email
+          AND v.type = :type
+          AND v.usedAt IS NULL
+          AND v.expiresAt > :now
+        """)
+    Optional<VerificationToken> findActiveByEmailAndTypeForUpdate(String email, TokenType type, Instant now);
+
     void deleteByExpiresAtBeforeOrUsedAtIsNotNull(Instant now);
 
 }

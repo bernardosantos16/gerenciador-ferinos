@@ -77,6 +77,9 @@ public abstract class IntegrationTestBase {
     protected static final String JWT_ISSUER  = "geradortimes-test";
     protected static final long   JWT_TTL_SEC = 900L; // 15 min
 
+    // ── Token pepper (must match test profile argon.hash.pepper) ─────────────
+    protected static final String TOKEN_PEPPER = "dev-test-pepper";
+
     // ── Mocked external dependencies ────────────────────────────────────────
     @MockitoBean
     protected RabbitTemplate rabbitTemplate;
@@ -240,12 +243,14 @@ public abstract class IntegrationTestBase {
     private String createToken(String email, TokenType type) {
         int raw = 100000 + new java.security.SecureRandom().nextInt(900000);
         String token = String.valueOf(raw);
-        String hash = sha256(token);
+        String salt = generateSalt();
+        String hash = sha256(token + TOKEN_PEPPER + salt);
         VerificationToken vt = VerificationToken.create(
                 hash,
                 type,
                 Instant.now().plus(15, ChronoUnit.MINUTES),
-                email
+                email,
+                salt
         );
         verificationTokenRepository.save(vt);
         return token;
@@ -259,6 +264,12 @@ public abstract class IntegrationTestBase {
         } catch (java.security.NoSuchAlgorithmException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    protected static String generateSalt() {
+        byte[] bytes = new byte[32];
+        new java.security.SecureRandom().nextBytes(bytes);
+        return HexFormat.of().formatHex(bytes);
     }
 
     /**

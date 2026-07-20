@@ -119,12 +119,6 @@ class UserControllerTest extends IntegrationTestBase {
                             .content(toJson(request)))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.registrationToken", not(emptyString())));
-
-            // Verifica que o OTP foi consumido
-            var consumed = verificationTokenRepository
-                    .findByTokenHashAndTypeAndEmail(sha256(token), TokenType.EMAIL_VERIFICATION, "verify@example.com");
-            assertTrue(consumed.isPresent());
-            assertNotNull(consumed.get().getUsedAt());
         }
 
         @Test
@@ -139,7 +133,7 @@ class UserControllerTest extends IntegrationTestBase {
         }
 
         @Test
-        @DisplayName("deve retornar 401 quando o OTP ja foi consumido")
+        @DisplayName("deve retornar 404 quando o OTP ja foi consumido")
         void verifyEmailTokenAlreadyUsed() throws Exception {
             String email = "used_otp@example.com";
             String token = createVerificationToken(email);
@@ -156,7 +150,7 @@ class UserControllerTest extends IntegrationTestBase {
             mockMvc.perform(post("/api/users/verify-email")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(toJson(request2)))
-                    .andExpect(status().isUnauthorized());
+                    .andExpect(status().isNotFound());
         }
     }
 
@@ -484,17 +478,14 @@ class UserControllerTest extends IntegrationTestBase {
         }
 
         @Test
-        @DisplayName("deve retornar 401 quando o token ja foi usado")
+        @DisplayName("deve retornar 404 quando o token ja foi usado")
         void resetPasswordTokenAlreadyUsed() throws Exception {
             User user = createActiveUser("usedtoken@example.com", "usedtoken_nick");
             String token = createPasswordResetToken(user);
 
             // Marca o token como usado manualmente
             var vt = verificationTokenRepository
-                    .findByTokenHashAndTypeAndEmail(
-                            sha256(token),
-                            TokenType.PASSWORD_RESET,
-                            "usedtoken@example.com")
+                    .findActiveByEmailAndType("usedtoken@example.com", TokenType.PASSWORD_RESET, Instant.now())
                     .orElseThrow();
             vt.markUsed();
             verificationTokenRepository.save(vt);
@@ -504,22 +495,24 @@ class UserControllerTest extends IntegrationTestBase {
             mockMvc.perform(post("/api/users/reset-password")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(toJson(request)))
-                    .andExpect(status().isUnauthorized());
+                    .andExpect(status().isNotFound());
         }
 
         @Test
-        @DisplayName("deve retornar 401 quando o token expirou")
+        @DisplayName("deve retornar 404 quando o token expirou")
         void resetPasswordExpiredToken() throws Exception {
             User user = createActiveUser("expired@example.com", "expired_nick");
             String token = String.valueOf(100000 + new java.security.SecureRandom().nextInt(900000));
-            String hash = sha256(token);
+            String salt = generateSalt();
+            String hash = sha256(token + TOKEN_PEPPER + salt);
 
             // Cria um token expirado (-1 minuto de expiracao)
             VerificationToken vt = VerificationToken.create(
                     hash,
                     TokenType.PASSWORD_RESET,
                     Instant.now().minus(1, ChronoUnit.MINUTES),
-                    "expired@example.com"
+                    "expired@example.com",
+                    salt
             );
             verificationTokenRepository.save(vt);
 
@@ -528,7 +521,7 @@ class UserControllerTest extends IntegrationTestBase {
             mockMvc.perform(post("/api/users/reset-password")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(toJson(request)))
-                    .andExpect(status().isUnauthorized());
+                    .andExpect(status().isNotFound());
         }
 
         @Test

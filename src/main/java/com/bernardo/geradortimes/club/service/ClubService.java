@@ -79,6 +79,7 @@ public class ClubService {
     public ClubResponseDTO getClub(UUID id) {
         Club club = clubRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "club not found"));
+        clubAuthorizationService.requireMember(id);
 
         return new ClubResponseDTO(club.getId(), club.getName(), club.getNickname().getValue());
     }
@@ -86,6 +87,7 @@ public class ClubService {
     public ClubResponseDTO getClubByNickname(String nickname) {
         Club club = clubRepository.findByNicknameValue(nickname)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "club not found"));
+        clubAuthorizationService.requireMember(club.getId());
 
         return new ClubResponseDTO(club.getId(), club.getName(), club.getNickname().getValue());
     }

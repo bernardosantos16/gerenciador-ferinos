@@ -169,6 +169,7 @@ class ClubControllerTest extends IntegrationTestBase {
         void getByIdSuccess() throws Exception {
             User user = createActiveUser("getter@club.com", "getter_nick");
             Club club = createClub("Clube Get Test", "club_get");
+            createClubMember(user.getId(), club.getId(), ClubRole.MEMBER);
 
             mockMvc.perform(get("/api/clubs/{id}", club.getId())
                             .header("Authorization", bearerToken(user)))

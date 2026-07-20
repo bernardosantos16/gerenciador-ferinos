@@ -5,6 +5,7 @@ import com.bernardo.geradortimes.shared.observability.LogSanitizer;
 import com.bernardo.geradortimes.user.model.VerificationToken;
 import com.bernardo.geradortimes.user.repository.VerificationTokenRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,24 +33,30 @@ public class VerificationTokenService {
 
     private final VerificationTokenRepository verificationTokenRepository;
 
+    @Value("${argon.hash.pepper}")
+    private String tokenPepper;
+
     public VerificationTokenService(VerificationTokenRepository verificationTokenRepository) {
         this.verificationTokenRepository = verificationTokenRepository;
     }
 
     /**
-     * Gera um token numerico de 6 digitos, aplica hash SHA-256, persiste um
+     * Gera um token numerico de 6 digitos, gera um salt aleatorio de 256 bits,
+     * aplica hash SHA-256(token + pepper + salt), persiste um
      * {@link VerificationToken} do tipo {@link TokenType#EMAIL_VERIFICATION}
      * com expiracao de {@value EXPIRATION_MINUTES} minutos e retorna o token em texto puro.
      */
     public String issueEmailVerificationToken(String email) {
         String token = generateNumericToken();
-        String tokenHash = sha256(token);
+        String salt = generateSalt();
+        String tokenHash = hashToken(token, salt);
         Instant expiresAt = Instant.now().plus(EXPIRATION_MINUTES, ChronoUnit.MINUTES);
 
         verificationTokenRepository.
                 findActiveByEmailAndType(email, TokenType.EMAIL_VERIFICATION, Instant.now()).ifPresentOrElse(
                         verificationToken -> {
                             verificationToken.setTokenHash(tokenHash);
+                            verificationToken.setTokenSalt(salt);
                             verificationToken.setExpiresAt(expiresAt);
                             log.info("Token de verificacao de email atualizado - email: {}", LogSanitizer.maskEmail(email));
                         },
@@ -58,7 +65,8 @@ public class VerificationTokenService {
                                     tokenHash,
                                     TokenType.EMAIL_VERIFICATION,
                                     expiresAt,
-                                    email
+                                    email,
+                                    salt
                             );
                             verificationTokenRepository.save(verificationToken);
                             log.info("Token de verificacao de email gerado - email: {}", LogSanitizer.maskEmail(email));
@@ -68,27 +76,13 @@ public class VerificationTokenService {
     }
 
     /**
-     * Valida um token de verificacao de email sem consumi-lo.
-     * Lanca excecao se o token for invalido, expirado ou ja usado.
+     * Valida um token de verificacao de email.
+     * Busca o token ativo por email + tipo, recupera o salt, computa o hash
+     * e compara. Lanca excecao se o token for invalido, expirado ou ja usado.
      */
     public void verifyEmailToken(String token, String email, Boolean consume) {
-        String tokenHash = sha256(token);
+        VerificationToken vt = findAndVerifyToken(token, email, TokenType.EMAIL_VERIFICATION);
 
-        VerificationToken vt = verificationTokenRepository
-                .findByTokenHashAndTypeAndEmailForUpdate(tokenHash, TokenType.EMAIL_VERIFICATION, email)
-                .orElseThrow(() -> {
-                    log.warn("Token de verificacao de email invalido - email: {}", LogSanitizer.maskEmail(email));
-                    return new ResponseStatusException(NOT_FOUND, "invalid or expired verification token");
-                });
-
-        if (vt.isExpired()) {
-            log.warn("Token de verificacao de email expirado - email: {}", LogSanitizer.maskEmail(email));
-            throw new ResponseStatusException(UNAUTHORIZED, "verification token expired");
-        }
-        if (vt.isUsed()) {
-            log.warn("Token de verificacao de email ja utilizado - email: {}", LogSanitizer.maskEmail(email));
-            throw new ResponseStatusException(UNAUTHORIZED, "verification token already used");
-        }
         if (consume) {
             vt.markUsed();
             verificationTokenRepository.save(vt);
@@ -96,16 +90,18 @@ public class VerificationTokenService {
     }
 
     /**
-     * Gera um token numerico de 6 digitos, aplica hash SHA-256, persiste um
-     * {@link VerificationToken} do tipo {@link TokenType#PASSWORD_RESET}
-     * com expiracao de {@value EXPIRATION_MINUTES} minutos e retorna o token em texto puro.
+     * Gera um token numerico de 6 digitos, gera um salt aleatorio, aplica hash
+     * SHA-256(token + pepper + salt), persiste um {@link VerificationToken} do tipo
+     * {@link TokenType#PASSWORD_RESET} com expiracao de {@value EXPIRATION_MINUTES}
+     * minutos e retorna o token em texto puro.
      */
     public String issuePasswordResetToken(String email) {
         String token = generateNumericToken();
-        String tokenHash = sha256(token);
+        String salt = generateSalt();
+        String tokenHash = hashToken(token, salt);
         Instant expiresAt = Instant.now().plus(EXPIRATION_MINUTES, ChronoUnit.MINUTES);
 
-        VerificationToken vt = VerificationToken.create(tokenHash, TokenType.PASSWORD_RESET, expiresAt, email);
+        VerificationToken vt = VerificationToken.create(tokenHash, TokenType.PASSWORD_RESET, expiresAt, email, salt);
         verificationTokenRepository.save(vt);
 
         log.info("Token de recuperacao de senha gerado - email: {}", LogSanitizer.maskEmail(email));
@@ -113,27 +109,12 @@ public class VerificationTokenService {
     }
 
     /**
-     * Valida um token de recuperacao de senha: faz hash SHA-256 do token recebido,
-     * busca no banco, verifica expiracao e uso e marca como usado.
+     * Valida um token de recuperacao de senha: busca o token ativo por email + tipo,
+     * recupera o salt, computa o hash e compara com o armazenado. Em caso de sucesso,
+     * marca como usado.
      */
     public void verifyPasswordResetToken(String token, String email) {
-        String tokenHash = sha256(token);
-
-        VerificationToken vt = verificationTokenRepository
-                .findByTokenHashAndTypeAndEmailForUpdate(tokenHash, TokenType.PASSWORD_RESET, email)
-                .orElseThrow(() -> {
-                    log.warn("Token de recuperacao de senha invalido - email: {}", LogSanitizer.maskEmail(email));
-                    return new ResponseStatusException(NOT_FOUND, "invalid or expired verification token");
-                });
-
-        if (vt.isExpired()) {
-            log.warn("Token de recuperacao de senha expirado - email: {}", LogSanitizer.maskEmail(email));
-            throw new ResponseStatusException(UNAUTHORIZED, "verification token expired");
-        }
-        if (vt.isUsed()) {
-            log.warn("Token de recuperacao de senha ja utilizado - email: {}", LogSanitizer.maskEmail(email));
-            throw new ResponseStatusException(UNAUTHORIZED, "verification token already used");
-        }
+        VerificationToken vt = findAndVerifyToken(token, email, TokenType.PASSWORD_RESET);
 
         vt.markUsed();
         verificationTokenRepository.save(vt);
@@ -151,9 +132,42 @@ public class VerificationTokenService {
         log.debug("Limpeza de tokens expirados/consumidos executada");
     }
 
+    /**
+     * Busca o token ativo (nao expirado, nao usado) por email + tipo com lock
+     * pessimista, recupera o salt, computa o hash do token submetido e compara.
+     * Unifica a mensagem de erro para todos os casos de falha (nao distingue
+     * "token nao encontrado" de "salt/hash mismatch").
+     */
+    private VerificationToken findAndVerifyToken(String rawToken, String email, TokenType type) {
+        VerificationToken vt = verificationTokenRepository
+                .findActiveByEmailAndTypeForUpdate(email, type, Instant.now())
+                .orElseThrow(() -> {
+                    log.warn("Token invalido ou expirado - type: {}, email: {}", type, LogSanitizer.maskEmail(email));
+                    return new ResponseStatusException(NOT_FOUND, "invalid or expired verification token");
+                });
+
+        String expectedHash = hashToken(rawToken, vt.getTokenSalt());
+        if (!expectedHash.equals(vt.getTokenHash())) {
+            log.warn("Token invalido - hash mismatch - type: {}, email: {}", type, LogSanitizer.maskEmail(email));
+            throw new ResponseStatusException(NOT_FOUND, "invalid or expired verification token");
+        }
+
+        return vt;
+    }
+
+    private String hashToken(String token, String salt) {
+        return sha256(token + tokenPepper + salt);
+    }
+
     private static String generateNumericToken() {
         int token = 100000 + SECURE_RANDOM.nextInt(900000);
         return String.valueOf(token);
+    }
+
+    private static String generateSalt() {
+        byte[] bytes = new byte[32]; // 256 bits
+        SECURE_RANDOM.nextBytes(bytes);
+        return HexFormat.of().formatHex(bytes);
     }
 
     static String sha256(String input) {

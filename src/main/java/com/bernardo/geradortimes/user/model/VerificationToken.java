@@ -35,18 +35,23 @@ public class VerificationToken {
     @Column(nullable = false, length = 100)
     private String email;
 
+    @Column(name = "token_salt", length = 64)
+    @Setter
+    private String tokenSalt;
+
     protected VerificationToken() {
     }
 
-    private VerificationToken(String tokenHash, TokenType type, Instant expiresAt, String email) {
+    private VerificationToken(String tokenHash, TokenType type, Instant expiresAt, String email, String tokenSalt) {
         this.tokenHash = tokenHash;
         this.type = type;
         this.expiresAt = expiresAt;
         this.email = email;
+        this.tokenSalt = tokenSalt;
     }
 
-    public static VerificationToken create(String tokenHash, TokenType type, Instant expiresAt, String email) {
-        return new VerificationToken(tokenHash, type, expiresAt, email);
+    public static VerificationToken create(String tokenHash, TokenType type, Instant expiresAt, String email, String tokenSalt) {
+        return new VerificationToken(tokenHash, type, expiresAt, email, tokenSalt);
     }
 
     public boolean isExpired() {
