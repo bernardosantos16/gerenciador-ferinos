@@ -37,12 +37,19 @@ public class ClubAuthorizationService {
 
     public void requireDirector(UUID clubId) {
         UUID userId = currentUserService.requireUserId();
-        boolean isDirector = clubMemberRepository.existsByClubIdAndUserIdAndClubRole(clubId, userId, ClubRole.DIRECTOR);
-        if (!isDirector) {
+        if (!isDirector(clubId, userId)) {
             log.warn("Autorizacao negada - usuario nao e diretor do clube - userId: {}, clubId: {}, requiredRole: DIRECTOR",
                     userId, clubId);
             throw new ResponseStatusException(FORBIDDEN, "director role required");
         }
+    }
+
+    public boolean isDirector(UUID clubId) {
+        return isDirector(clubId, currentUserService.requireUserId());
+    }
+
+    private boolean isDirector(UUID clubId, UUID userId) {
+        return clubMemberRepository.existsByClubIdAndUserIdAndClubRole(clubId, userId, ClubRole.DIRECTOR);
     }
 }
 

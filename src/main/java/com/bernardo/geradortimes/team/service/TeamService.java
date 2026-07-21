@@ -78,7 +78,7 @@ public class TeamService {
         Team team = Team.create(request.matchId(), request.clubJerseyId());
         Team saved = teamRepository.save(team);
         log.info("time criado - teamId: {}, matchId: {}", saved.getId(), request.matchId());
-        return toResponse(saved);
+        return toResponse(saved, true);
     }
 
     @Transactional(readOnly = true)
@@ -87,7 +87,8 @@ public class TeamService {
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "team not found"));
         Match match = requireMatch(team.getMatchId());
         clubAuthorizationService.requireMember(match.getClubId());
-        return toResponse(team);
+        boolean isDirector = clubAuthorizationService.isDirector(match.getClubId());
+        return toResponse(team, isDirector);
     }
 
     @Transactional(readOnly = true)
@@ -97,7 +98,8 @@ public class TeamService {
         }
         Match match = requireMatch(matchId);
         clubAuthorizationService.requireMember(match.getClubId());
-        return teamRepository.findByMatchId(matchId, pageable).map(TeamService::toResponse);
+        boolean isDirector = clubAuthorizationService.isDirector(match.getClubId());
+        return teamRepository.findByMatchId(matchId, pageable).map(team -> toResponse(team, isDirector));
     }
 
     public TeamResponseDTO updateJersey(Long id, UpdateTeamJerseyRequestDTO request) {
@@ -108,7 +110,7 @@ public class TeamService {
         ensureMatchResultNotSet(match);
         validateJersey(match.getClubId(), request.clubJerseyId());
         team.changeJersey(request.clubJerseyId());
-        return toResponse(team);
+        return toResponse(team, true);
     }
 
     public TeamResponseDTO update(Long id, UpdateTeamRequestDTO request) {
@@ -123,7 +125,7 @@ public class TeamService {
 
         Team saved = teamRepository.save(team);
         log.info("time atualizado - teamId: {}, matchId: {}", saved.getId(), team.getMatchId());
-        return toResponse(saved);
+        return toResponse(saved, true);
     }
 
     public GenerateTeamsResponseDTO generate(GenerateTeamsRequestDTO request) {
@@ -435,8 +437,9 @@ public class TeamService {
         teamRepository.saveAll(teams);
     }
 
-    private static TeamResponseDTO toResponse(Team team) {
-        return new TeamResponseDTO(team.getId(), team.getMatchId(), team.getClubJerseyId(), team.getScore());
+    private static TeamResponseDTO toResponse(Team team, boolean includeScore) {
+        return new TeamResponseDTO(team.getId(), team.getMatchId(), team.getClubJerseyId(),
+                includeScore ? team.getScore() : null);
     }
 
     private static List<Long> normalizeIds(List<Long> ids, String fieldName) {

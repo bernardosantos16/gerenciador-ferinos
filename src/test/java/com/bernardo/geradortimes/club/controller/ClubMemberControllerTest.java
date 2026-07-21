@@ -164,7 +164,23 @@ class ClubMemberControllerTest extends IntegrationTestBase {
                             .header("Authorization", bearerToken(ctx.member())))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", not(empty())))
-                    .andExpect(jsonPath("$.totalElements", greaterThanOrEqualTo(2))); // Diretor + Membro comum
+                    .andExpect(jsonPath("$.totalElements", greaterThanOrEqualTo(2)))
+                    .andExpect(jsonPath("$.content[*].rating", everyItem(nullValue())))
+                    .andExpect(jsonPath("$.content[*].timesMvp", everyItem(nullValue())))
+                    .andExpect(jsonPath("$.content[*].timesChampion", everyItem(nullValue())));
+        }
+
+        @Test
+        @DisplayName("deve expor rating e estatisticas quando usuário é DIRECTOR")
+        void listExposesRatingForDirector() throws Exception {
+            TestContext ctx = setupContext("list_dir_rating");
+
+            mockMvc.perform(get("/api/clubs/{clubId}/members", ctx.club().getId())
+                            .header("Authorization", bearerToken(ctx.director())))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[*].rating", not(everyItem(nullValue()))))
+                    .andExpect(jsonPath("$.content[*].timesMvp", notNullValue()))
+                    .andExpect(jsonPath("$.content[*].timesChampion", notNullValue()));
         }
 
         @Test

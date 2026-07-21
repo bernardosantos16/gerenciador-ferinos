@@ -151,7 +151,8 @@ class TeamControllerTest extends IntegrationTestBase {
             mockMvc.perform(get("/api/teams/{id}", team.getId())
                             .header("Authorization", bearerToken(member)))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.id", is(team.getId().intValue())));
+                    .andExpect(jsonPath("$.id", is(team.getId().intValue())))
+                    .andExpect(jsonPath("$.score", nullValue()));
         }
 
         @Test
@@ -198,7 +199,8 @@ class TeamControllerTest extends IntegrationTestBase {
                             .param("matchId", match.getId().toString())
                             .header("Authorization", bearerToken(member)))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.content", hasSize(2)));
+                    .andExpect(jsonPath("$.content", hasSize(2)))
+                    .andExpect(jsonPath("$.content[*].score", everyItem(nullValue())));
         }
 
         @Test
