@@ -103,7 +103,7 @@ public class TeamService {
     }
 
     public TeamResponseDTO updateJersey(Long id, UpdateTeamJerseyRequestDTO request) {
-        Team team = teamRepository.findById(id)
+        Team team = teamRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "team not found"));
         Match match = requireMatch(team.getMatchId());
         clubAuthorizationService.requireDirector(match.getClubId());
@@ -114,7 +114,7 @@ public class TeamService {
     }
 
     public TeamResponseDTO update(Long id, UpdateTeamRequestDTO request) {
-        Team team = teamRepository.findById(id)
+        Team team = teamRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "team not found"));
 
         Match match = requireMatch(team.getMatchId());
@@ -376,7 +376,7 @@ public class TeamService {
     }
 
     public void delete(Long id) {
-        Team team = teamRepository.findById(id)
+        Team team = teamRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "team not found"));
         Match match = requireMatch(team.getMatchId());
         clubAuthorizationService.requireDirector(match.getClubId());

@@ -85,7 +85,7 @@ public class ClubMemberService {
     @Transactional
     public ClubMemberResponseDTO updateMember(UUID clubId, Long memberId, UpdateClubMemberRequestDTO request) {
         clubAuthorizationService.requireDirector(clubId);
-        ClubMember member = clubMemberRepository.findById(memberId)
+        ClubMember member = clubMemberRepository.findByIdForUpdate(memberId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "member not found"));
         if (!clubId.equals(member.getClubId())) {
             throw new ResponseStatusException(NOT_FOUND, "member not found");
