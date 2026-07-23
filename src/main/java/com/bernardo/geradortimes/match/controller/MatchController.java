@@ -166,21 +166,22 @@ public class MatchController {
     }
 
     @GetMapping("/{id}/participants")
-    @Operation(summary = "Listar participantes de uma partida")
+    @Operation(summary = "Listar participantes de uma partida (paginado)")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Lista de participantes.",
-                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = MatchParticipantResponseDTO.class)))),
+            @ApiResponse(responseCode = "200", description = "Pagina de participantes.",
+                    content = @Content(schema = @Schema(implementation = MatchParticipantResponseDTO.class))),
             @ApiResponse(responseCode = "401", description = "Nao autenticado."),
             @ApiResponse(responseCode = "403", description = "Usuario nao possui permissao (MEMBER requerido).",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
             @ApiResponse(responseCode = "404", description = "Partida nao encontrada.",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
-    public List<MatchParticipantResponseDTO> listParticipants(
+    public Page<MatchParticipantResponseDTO> listParticipants(
             @Parameter(description = "ID da partida.", required = true, example = "f47ac10b-58cc-4372-a567-0e02b2c3d479")
-            @PathVariable UUID id
+            @PathVariable UUID id,
+            @PageableDefault(size = 50) Pageable pageable
     ) {
-        return matchService.listParticipants(id);
+        return matchService.listParticipants(id, pageable);
     }
 
     @PatchMapping("/{id}/result")

@@ -79,6 +79,11 @@ public class MatchService {
             throw new ResponseStatusException(BAD_REQUEST, "endDate must be after or equal to startDate");
         }
 
+        long daysBetween = request.startDate().until(request.endDate()).getDays();
+        if (daysBetween > 90) {
+            throw new ResponseStatusException(BAD_REQUEST, "date range cannot exceed 90 days");
+        }
+
         List<Match> matches = new ArrayList<>();
         LocalDate current = request.startDate();
         while (!current.isAfter(request.endDate())) {
@@ -120,11 +125,11 @@ public class MatchService {
     }
 
     @Transactional(readOnly = true)
-    public List<MatchParticipantResponseDTO> listParticipants(UUID matchId) {
+    public Page<MatchParticipantResponseDTO> listParticipants(UUID matchId, Pageable pageable) {
         Match match = matchRepository.findById(matchId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "match not found"));
         clubAuthorizationService.requireMember(match.getClubId());
-        return matchParticipantRepository.findByMatchId(matchId).stream().map(MatchService::toResponse).toList();
+        return matchParticipantRepository.findByMatchId(matchId, pageable).map(MatchService::toResponse);
     }
 
     public MatchResponseDTO update(UUID id, UpdateMatchRequestDTO request) {

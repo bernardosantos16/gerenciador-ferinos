@@ -4,6 +4,7 @@ import com.bernardo.geradortimes.auth.config.JwtProperties;
 import com.bernardo.geradortimes.auth.model.RefreshToken;
 import com.bernardo.geradortimes.auth.repository.RefreshTokenRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -98,6 +99,16 @@ public class RefreshTokenService {
             return Base64.getUrlEncoder().withoutPadding().encodeToString(digest);
         } catch (NoSuchAlgorithmException | InvalidKeyException e) {
             throw new IllegalStateException("unable to hash refresh token", e);
+        }
+    }
+
+    @Scheduled(fixedRate = 3600_000)
+    public void cleanRevokedOrExpired() {
+        int deleted = refreshTokenRepository.deleteRevokedOrExpired();
+        if (deleted > 0) {
+            log.info("Limpeza de refresh tokens revogados/expirados - removidos: {}", deleted);
+        } else {
+            log.debug("Limpeza de refresh tokens revogados/expirados executada - nenhum removido");
         }
     }
 }

@@ -23,7 +23,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -61,19 +60,20 @@ public class ClubJerseyController {
     }
 
     @GetMapping
-    @Operation(summary = "Listar camisas do clube")
+    @Operation(summary = "Listar camisas do clube (paginado)")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Lista de camisas.",
-                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = ClubJerseyResponseDTO.class)))),
+            @ApiResponse(responseCode = "200", description = "Pagina de camisas.",
+                    content = @Content(schema = @Schema(implementation = ClubJerseyResponseDTO.class))),
             @ApiResponse(responseCode = "401", description = "Nao autenticado."),
             @ApiResponse(responseCode = "403", description = "Usuario nao possui permissao (MEMBER requerido).",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
-    public List<ClubJerseyResponseDTO> list(
+    public Page<ClubJerseyResponseDTO> list(
             @Parameter(description = "ID do clube.", required = true, example = "c0a8012e-6f1f-4b4b-9f5e-7a8b9c0d1e2f")
-            @PathVariable UUID clubId
+            @PathVariable UUID clubId,
+            @PageableDefault(size = 20) Pageable pageable
     ) {
-        return clubJerseyService.listByClub(clubId);
+        return clubJerseyService.pageByClub(clubId, pageable);
     }
 
     @PatchMapping("/{jerseyId}")

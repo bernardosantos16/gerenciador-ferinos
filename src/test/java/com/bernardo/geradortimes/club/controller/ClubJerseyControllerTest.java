@@ -137,8 +137,8 @@ class ClubJerseyControllerTest extends IntegrationTestBase {
             mockMvc.perform(get("/api/clubs/{clubId}/jerseys", ctx.club().getId())
                             .header("Authorization", bearerToken(ctx.member())))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(greaterThanOrEqualTo(1))))
-                    .andExpect(jsonPath("$[0].id", is(ctx.jersey().getId().intValue())));
+                    .andExpect(jsonPath("$.content", hasSize(greaterThanOrEqualTo(1))))
+                    .andExpect(jsonPath("$.content[0].id", is(ctx.jersey().getId().intValue())));
         }
 
         @Test
@@ -245,7 +245,7 @@ class ClubJerseyControllerTest extends IntegrationTestBase {
             mockMvc.perform(get("/api/clubs/{clubId}/jerseys", ctx.club().getId())
                             .header("Authorization", bearerToken(ctx.director())))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(0)));
+                    .andExpect(jsonPath("$.content", hasSize(0)));
         }
 
         @Test

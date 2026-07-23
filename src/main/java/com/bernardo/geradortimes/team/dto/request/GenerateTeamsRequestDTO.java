@@ -3,6 +3,7 @@ package com.bernardo.geradortimes.team.dto.request;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 import java.util.List;
 import java.util.UUID;
@@ -17,6 +18,7 @@ public record GenerateTeamsRequestDTO(
                 example = "[1,2,3,4,5,6,7,8,9,10]"
         )
         @NotNull
+        @Size(min = 2, max = 50)
         List<Long> lineMemberIds,
 
         @Schema(
@@ -24,6 +26,7 @@ public record GenerateTeamsRequestDTO(
                 example = "[101,102,103]"
         )
         @NotNull
+        @Size(max = 50)
         List<Long> goalkeeperMemberIds,
 
         @Schema(

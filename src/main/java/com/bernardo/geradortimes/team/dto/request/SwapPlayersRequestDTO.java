@@ -2,6 +2,7 @@ package com.bernardo.geradortimes.team.dto.request;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 import java.util.List;
 import java.util.UUID;
@@ -20,6 +21,7 @@ public record SwapPlayersRequestDTO(
                 example = "[{\"memberIdFrom\": 1, \"memberIdTo\": 2}, {\"memberIdFrom\": 3, \"memberIdTo\": 4}]"
         )
         @NotNull
+        @Size(min = 1, max = 50)
         List<PlayerSwapDTO> swaps
 ) {
 }
