@@ -266,8 +266,8 @@ class MatchControllerTest extends IntegrationTestBase {
             mockMvc.perform(get("/api/matches/{id}/participants", match.getId())
                             .header("Authorization", bearerToken(member)))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.content", hasSize(1)))
-                    .andExpect(jsonPath("$.content[0].clubMemberId", is(clubMember.getId().intValue())));
+                    .andExpect(jsonPath("$", hasSize(1)))
+                    .andExpect(jsonPath("$[0].clubMemberId", is(clubMember.getId().intValue())));
         }
 
         @Test

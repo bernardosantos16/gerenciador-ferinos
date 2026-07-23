@@ -124,11 +124,11 @@ public class MatchService {
     }
 
     @Transactional(readOnly = true)
-    public Page<MatchParticipantResponseDTO> listParticipants(UUID matchId, Pageable pageable) {
+    public List<MatchParticipantResponseDTO> listParticipants(UUID matchId) {
         Match match = matchRepository.findById(matchId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "match not found"));
         clubAuthorizationService.requireMember(match.getClubId());
-        return matchParticipantRepository.findByMatchId(matchId, pageable).map(MatchService::toResponse);
+        return matchParticipantRepository.findByMatchId(matchId).stream().map(MatchService::toResponse).toList();
     }
 
     public MatchResponseDTO update(UUID id, UpdateMatchRequestDTO request) {
