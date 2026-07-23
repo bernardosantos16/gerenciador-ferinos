@@ -18,8 +18,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Rate limit por IP para endpoints sensiveis (login, registro, envio/verificacao de
- * email, recuperacao/redefinicao de senha).
+ * Rate limit por IP para endpoints sensiveis (login, refresh, registro, envio/verificacao de
+ * email, recuperacao/redefinicao de senha, geracao de times).
  * <p>
  * Janela deslizante simples: cada IP pode fazer ate {@code maxRequests} requisicoes
  * dentro de {@code windowSeconds}. Ao estourar, retorna HTTP 429.
@@ -30,11 +30,13 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     private static final Set<String> PROTECTED_URIS = Set.of(
             "/api/auth/login",
+            "/api/auth/refresh",
             "/api/users",
             "/api/users/email",
             "/api/users/verify-email",
             "/api/users/forgot-password",
-            "/api/users/reset-password"
+            "/api/users/reset-password",
+            "/api/teams/generate"
     );
 
     private final Map<String, Entry> counters = new ConcurrentHashMap<>();

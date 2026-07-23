@@ -141,7 +141,7 @@ public class TeamService {
                 maxLinePlayers
         );
 
-        Match match = matchRepository.findById(matchId)
+        Match match = matchRepository.findByIdForUpdate(matchId)
                 .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "match not found: " + matchId));
         clubAuthorizationService.requireDirector(match.getClubId());
         ensureMatchResultNotSet(match);
@@ -289,7 +289,7 @@ public class TeamService {
             throw new ResponseStatusException(BAD_REQUEST, "swaps list cannot be empty");
         }
 
-        Match match = matchRepository.findById(matchId)
+        Match match = matchRepository.findByIdForUpdate(matchId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "match not found"));
         clubAuthorizationService.requireDirector(match.getClubId());
         ensureMatchResultNotSet(match);
