@@ -37,7 +37,7 @@ A classe deve possuir:
  * Covers: descrição resumida das funcionalidades testadas.
  */
 @DisplayName("XxxController – Integration Tests")
-class XxxControllerTest extends IntegrationTestBase {
+class XxxControllerTest extends IntegrationTestBase {}
 ```
 
 ---

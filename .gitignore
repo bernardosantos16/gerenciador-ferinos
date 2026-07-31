@@ -1,6 +1,7 @@
 .env
 .dockerignore
 AGENTS-CONTEXT.md
+AGENTS.md
 graphify-out/
 .opencode/
 .opencodeignore
