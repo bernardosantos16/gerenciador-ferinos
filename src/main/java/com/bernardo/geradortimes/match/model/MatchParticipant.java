@@ -35,21 +35,34 @@ public class MatchParticipant {
     @Column(name = "team_id")
     private Long teamId;
 
+    @Column(name = "sort_order", nullable = false)
+    private int sortOrder;
+
     protected MatchParticipant() {}
 
-    private MatchParticipant(UUID matchId, Long clubMemberId, MatchParticipantPosition position, Long teamId) {
+    private MatchParticipant(UUID matchId, Long clubMemberId, MatchParticipantPosition position, Long teamId, int sortOrder) {
         this.matchId = matchId;
         this.clubMemberId = clubMemberId;
         this.position = position;
         this.teamId = teamId;
+        this.sortOrder = sortOrder;
     }
 
     public static MatchParticipant create(UUID matchId, Long clubMemberId, MatchParticipantPosition position, Long teamId) {
-        return new MatchParticipant(matchId, clubMemberId, position, teamId);
+        return new MatchParticipant(matchId, clubMemberId, position, teamId, 0);
+    }
+
+    public static MatchParticipant create(UUID matchId, Long clubMemberId, MatchParticipantPosition position, Long teamId, int sortOrder) {
+        return new MatchParticipant(matchId, clubMemberId, position, teamId, sortOrder);
     }
 
     public void assignTeam(Long teamId) {
         this.teamId = teamId;
+    }
+
+    public void assignTeam(Long teamId, int sortOrder) {
+        this.teamId = teamId;
+        this.sortOrder = sortOrder;
     }
 }
 

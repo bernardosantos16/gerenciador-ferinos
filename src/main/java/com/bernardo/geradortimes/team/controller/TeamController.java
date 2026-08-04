@@ -188,10 +188,14 @@ public class TeamController {
                     - Apenas jogadores da mesma posição podem ser trocados (LINE com LINE, GOAL com GOAL).
                     - Jogadores devem estar atribuidos a diferentes times.
                     - Ambos os jogadores devem estar atribuidos (nao podem ter teamId nulo).
+                    
+                    Retorna os times atualizados com scores recalculados, permitindo
+                    que o frontend atualize a UI sem precisar de refresh.
                     """
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Jogadores trocados com sucesso."),
+            @ApiResponse(responseCode = "200", description = "Jogadores trocados com sucesso. Retorna os times atualizados.",
+                    content = @Content(schema = @Schema(implementation = GenerateTeamsResponseDTO.class))),
             @ApiResponse(responseCode = "400", description = "Regra de negocio/validacao (ex.: times nao gerados, posicoes diferentes, etc.).",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
             @ApiResponse(responseCode = "401", description = "Nao autenticado."),
@@ -200,10 +204,9 @@ public class TeamController {
             @ApiResponse(responseCode = "404", description = "Partida nao encontrada.",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void swapPlayers(
+    public GenerateTeamsResponseDTO swapPlayers(
             @Valid @RequestBody SwapPlayersRequestDTO request
     ) {
-        teamService.swapPlayers(request);
+        return teamService.swapPlayers(request);
     }
 }

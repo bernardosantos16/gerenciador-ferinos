@@ -13,6 +13,8 @@ public interface MatchParticipantRepository extends JpaRepository<MatchParticipa
 
     List<MatchParticipant> findByMatchId(UUID matchId);
 
+    List<MatchParticipant> findByMatchIdOrderBySortOrder(UUID matchId);
+
     List<MatchParticipant> findByMatchIdAndTeamId(UUID matchId, Long teamId);
 
     Optional<MatchParticipant> findByMatchIdAndClubMemberId(UUID matchId, Long clubMemberId);

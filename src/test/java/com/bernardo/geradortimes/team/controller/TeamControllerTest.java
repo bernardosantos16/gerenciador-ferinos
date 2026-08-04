@@ -430,7 +430,7 @@ class TeamControllerTest extends IntegrationTestBase {
     class SwapPlayers {
 
         @Test
-        @DisplayName("deve trocar jogadores entre times e retornar 204")
+        @DisplayName("deve trocar jogadores entre times e retornar os times atualizados com scores")
         void swapSuccess() throws Exception {
             TestContext ctx = setupDirectorContext("swap");
 
@@ -457,7 +457,13 @@ class TeamControllerTest extends IntegrationTestBase {
                             .header("Authorization", bearerToken(ctx.director()))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(toJson(request)))
-                    .andExpect(status().isNoContent());
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.matchId", is(ctx.match().getId().toString())))
+                    .andExpect(jsonPath("$.teamCount", is(2)))
+                    .andExpect(jsonPath("$.teams", hasSize(2)))
+                    .andExpect(jsonPath("$.teams[*].teamId").exists())
+                    .andExpect(jsonPath("$.teams[*].lineMemberIds").exists())
+                    .andExpect(jsonPath("$.teams[*].totalScore").exists());
 
             // Verify the swap happened
             var p1 = matchParticipantRepository.findByMatchId(ctx.match().getId())

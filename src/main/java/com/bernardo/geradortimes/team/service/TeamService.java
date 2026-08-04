@@ -225,12 +225,14 @@ public class TeamService {
         );
 
         for (TeamBucket b : buckets) {
-            for (ScoredMember m : b.lineMembers) {
+            for (int i = 0; i < b.lineMembers.size(); i++) {
+                ScoredMember m = b.lineMembers.get(i);
                 participants.add(MatchParticipant.create(
                         matchId,
                         m.memberId,
                         MatchParticipantPosition.LINE,
-                        b.teamId
+                        b.teamId,
+                        i
                 ));
             }
             if (b.goalkeeperMemberId != null) {
@@ -280,7 +282,7 @@ public class TeamService {
         return new GenerateTeamsResponseDTO(matchId, teamCount, generatedTeams, unassignedGoalkeepers);
     }
 
-    public void swapPlayers(SwapPlayersRequestDTO request) {
+    public GenerateTeamsResponseDTO swapPlayers(SwapPlayersRequestDTO request) {
         UUID matchId = request.matchId();
         List<PlayerSwapDTO> swaps = request.swaps();
 
@@ -359,8 +361,9 @@ public class TeamService {
 
             // Perform the swap
             Long tempTeamId = p1.getTeamId();
-            p1.assignTeam(p2.getTeamId());
-            p2.assignTeam(tempTeamId);
+            int tempSortOrder = p1.getSortOrder();
+            p1.assignTeam(p2.getTeamId(), p2.getSortOrder());
+            p2.assignTeam(tempTeamId, tempSortOrder);
         }
 
         // Save all updated participants
@@ -373,6 +376,40 @@ public class TeamService {
                 matchId,
                 swaps.size()
         );
+
+        return buildGenerateResponse(matchId);
+    }
+
+    private GenerateTeamsResponseDTO buildGenerateResponse(UUID matchId) {
+        List<Team> updatedTeams = teamRepository.findByMatchId(matchId);
+        List<MatchParticipant> updatedParticipants = matchParticipantRepository.findByMatchIdOrderBySortOrder(matchId);
+
+        Map<Long, List<MatchParticipant>> byTeam = updatedParticipants.stream()
+                .filter(p -> p.getTeamId() != null)
+                .collect(Collectors.groupingBy(MatchParticipant::getTeamId));
+
+        List<GeneratedTeamDTO> generatedTeams = updatedTeams.stream()
+                .map(t -> {
+                    List<MatchParticipant> members = byTeam.getOrDefault(t.getId(), List.of());
+                    List<Long> lineIds = members.stream()
+                            .filter(p -> p.getPosition() == MatchParticipantPosition.LINE)
+                            .map(MatchParticipant::getClubMemberId)
+                            .toList();
+                    Long goalkeeperId = members.stream()
+                            .filter(p -> p.getPosition() == MatchParticipantPosition.GOAL)
+                            .map(MatchParticipant::getClubMemberId)
+                            .findFirst()
+                            .orElse(null);
+                    return new GeneratedTeamDTO(t.getId(), lineIds, goalkeeperId, t.getScore());
+                })
+                .toList();
+
+        List<Long> unassignedGoalkeepers = updatedParticipants.stream()
+                .filter(p -> p.getTeamId() == null && p.getPosition() == MatchParticipantPosition.GOAL)
+                .map(MatchParticipant::getClubMemberId)
+                .toList();
+
+        return new GenerateTeamsResponseDTO(matchId, updatedTeams.size(), generatedTeams, unassignedGoalkeepers);
     }
 
     public void delete(Long id) {
