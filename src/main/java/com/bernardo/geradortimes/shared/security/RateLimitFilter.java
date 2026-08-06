@@ -1,12 +1,12 @@
 package com.bernardo.geradortimes.shared.security;
 
+import com.bernardo.geradortimes.auth.config.RateLimitProperties;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -18,11 +18,14 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Rate limit por IP para endpoints sensiveis (login, refresh, registro, envio/verificacao de
+ * Rate limit por IP+endpoint para endpoints sensiveis (login, refresh, registro, envio/verificacao de
  * email, recuperacao/redefinicao de senha, geracao de times).
  * <p>
- * Janela deslizante simples: cada IP pode fazer ate {@code maxRequests} requisicoes
- * dentro de {@code windowSeconds}. Ao estourar, retorna HTTP 429.
+ * Cada endpoint tem seu proprio balde de contagem, isolando budgets. Janela deslizante simples:
+ * cada IP pode fazer ate {@code maxRequests} requisicoes por endpoint dentro de {@code windowSeconds}.
+ * Ao estourar o limite do endpoint, retorna HTTP 429.
+ * <p>
+ * Valores padrao e por endpoint configurados via {@code app.rate-limit.*}.
  */
 @Slf4j
 @Component
@@ -39,15 +42,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
             "/api/teams/generate"
     );
 
+    private final RateLimitProperties properties;
     private final Map<String, Entry> counters = new ConcurrentHashMap<>();
 
-    @Value("${app.rate-limit.max-requests:3}")
-    private int maxRequests;
-
-    @Value("${app.rate-limit.window-seconds:60}")
-    private long windowSeconds;
-
-
+    public RateLimitFilter(RateLimitProperties properties) {
+        this.properties = properties;
+    }
 
     private boolean shouldRateLimit(HttpServletRequest request) {
         return "POST".equalsIgnoreCase(request.getMethod())
@@ -64,12 +64,17 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     /**
      * Remove entradas expiradas a cada 5 minutos para evitar memory leak.
+     * Cada entrada usa sua propria janela de expiracao, permitindo endpoints com
+     * windowSeconds diferentes coexistirem no mesmo mapa.
      */
     @Scheduled(fixedRate = 300_000)
     public void cleanStaleEntries() {
-        long cutoff = System.currentTimeMillis() - (windowSeconds * 1000);
+        long now = System.currentTimeMillis();
         int before = counters.size();
-        counters.entrySet().removeIf(e -> e.getValue().windowStart < cutoff);
+        counters.entrySet().removeIf(e -> {
+            Entry entry = e.getValue();
+            return entry.windowStart < (now - entry.windowSeconds * 1000);
+        });
         log.debug("Limpeza de contadores de rate limit executada - antes: {}, depois: {}", before, counters.size());
     }
 
@@ -85,18 +90,24 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
 
         String ip = getClientIp(request);
+        String uri = request.getRequestURI();
+        String key = ip + "|" + uri;
         long now = System.currentTimeMillis();
+
+        long windowSeconds = properties.windowSecondsFor(uri);
+        int maxRequests = properties.maxRequestsFor(uri);
         long windowStart = now - (windowSeconds * 1000);
 
-        Entry entry = counters.compute(ip, (key, current) -> {
+        Entry entry = counters.compute(key, (k, current) -> {
             if (current == null || current.windowStart < windowStart) {
-                return new Entry(now, 1);
+                return new Entry(now, 1, windowSeconds);
             }
-            return new Entry(current.windowStart, current.count + 1);
+            return new Entry(current.windowStart, current.count + 1, windowSeconds);
         });
 
         if (entry.count > maxRequests) {
-            log.warn("Rate limit excedido para IP: {} ({} requisicoes em {}s)", ip, entry.count, windowSeconds);
+            log.warn("Rate limit excedido para IP {} no endpoint {} ({} requisicoes em {}s)",
+                    ip, uri, entry.count, windowSeconds);
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
             response.getWriter().write("{\"title\":\"Too many requests\",\"status\":429}");
             return;
@@ -105,6 +116,6 @@ public class RateLimitFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private record Entry(long windowStart, int count) {
+    private record Entry(long windowStart, int count, long windowSeconds) {
     }
 }
