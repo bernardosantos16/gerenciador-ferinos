@@ -2,6 +2,9 @@ package com.bernardo.geradortimes.match.repository;
 
 import com.bernardo.geradortimes.match.model.MatchParticipant;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -21,5 +24,7 @@ public interface MatchParticipantRepository extends JpaRepository<MatchParticipa
 
     List<MatchParticipant> findByClubMemberIdIn(List<Long> clubMemberIds);
 
-    void deleteByMatchId(UUID matchId);
+    @Modifying
+    @Query("DELETE FROM MatchParticipant mp WHERE mp.matchId = :matchId")
+    void deleteByMatchId(@Param("matchId") UUID matchId);
 }
