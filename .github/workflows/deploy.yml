@@ -84,5 +84,40 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            PROFILE=dev
+            PROFILE=prod
             APP_VERSION=${{ steps.extract_version.outputs.VERSION }}
+
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy to Public VM
+    needs: build-and-publish
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    steps:
+      - name: Execute remote SSH commands
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            # 1. Autenticar no Docker Hub
+            echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+            
+            # 2. Baixar a imagem mais recente
+            docker pull ${{ secrets.DOCKER_USERNAME }}/${{ env.APP_NAME }}:latest
+            
+            # 3. Parar e remover o container anterior (se existir)
+            docker stop ${{ env.APP_NAME }} || true
+            docker rm ${{ env.APP_NAME }} || true
+            
+            # 4. Executar o novo container com as variáveis injetadas via --env-file
+            docker run -d \
+              --name ${{ env.APP_NAME }} \
+              --restart unless-stopped \
+              -p 8080:8080 \
+              --env-file /home/ubuntu/gerador-times.env \
+              -e SPRING_PROFILES_ACTIVE=prod \
+              ${{ secrets.DOCKER_USERNAME }}/${{ env.APP_NAME }}:latest
+            
+            # 5. Limpar imagens antigas não utilizadas
+            docker image prune -f
