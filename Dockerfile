@@ -1,7 +1,7 @@
 # ==========================================
 # Estágio 1: Build
 # ==========================================
-FROM eclipse-temurin:21-jdk-alpine AS builder
+FROM eclipse-temurin:21-jdk AS builder
 WORKDIR /app
 
 # Copia apenas os arquivos de configuração do Maven primeiro (cache layer)
@@ -18,13 +18,13 @@ COPY src ./src
 RUN ./mvnw clean package -DskipTests -B
 
 # ==========================================
-# Estágio 2: Produção (imagem final leve)
+# Estágio 2: Produção (imagem final com glibc nativo)
 # ==========================================
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:21-jre
 WORKDIR /app
 
-# Usuário não-root por segurança
-RUN addgroup -S spring && adduser -S spring -G spring
+# Usuário não-root por segurança (Sintaxe Debian/Ubuntu)
+RUN groupadd -r spring && useradd -r -g spring spring
 
 # Copia o jar pelo nome fixo, independente de versão/artifactId
 COPY --from=builder /app/target/*.jar app.jar
