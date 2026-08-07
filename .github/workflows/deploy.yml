@@ -97,31 +97,37 @@ jobs:
     needs: build-and-publish
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     steps:
-      - name: Execute remote SSH commands
+      - name: Checkout deploy files
+        uses: actions/checkout@v7
+        with:
+          sparse-checkout: deploy
+          sparse-checkout-cone-mode: false
+
+      - name: Copy config files to VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          source: "deploy/nginx.conf,deploy/docker-compose.yml"
+          target: /home/ubuntu
+          strip_components: 1
+
+      - name: Deploy with docker compose
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_KEY }}
           script: |
-            # 1. Autenticar no Docker Hub
             echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
-            
-            # 2. Baixar a imagem mais recente
-            docker pull ${{ secrets.DOCKER_USERNAME }}/${{ env.APP_NAME }}:latest
-            
-            # 3. Parar e remover o container anterior (se existir)
+
             docker stop ${{ env.APP_NAME }} || true
             docker rm ${{ env.APP_NAME }} || true
-            
-            # 4. Executar o novo container com as variáveis injetadas via --env-file
-            docker run -d \
-              --name ${{ env.APP_NAME }} \
-              --restart unless-stopped \
-              -p 8080:8080 \
-              --env-file /home/ubuntu/gerador-times.env \
-              -e SPRING_PROFILES_ACTIVE=prod \
-              ${{ secrets.DOCKER_USERNAME }}/${{ env.APP_NAME }}:latest
-            
-            # 5. Limpar imagens antigas não utilizadas
+
+            docker pull ${{ secrets.DOCKER_USERNAME }}/${{ env.APP_NAME }}:latest
+
+            DOCKER_USERNAME="${{ secrets.DOCKER_USERNAME }}" \
+              docker compose -f /home/ubuntu/docker-compose.yml up -d
+
             docker image prune -f

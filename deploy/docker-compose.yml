@@ -1,0 +1,33 @@
+services:
+  app:
+    image: ${DOCKER_USERNAME}/gerador-times-app:latest
+    container_name: gerador-times-app
+    restart: unless-stopped
+    env_file:
+      - /home/ubuntu/gerador-times.env
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+    expose:
+      - "8080"
+    networks:
+      - gerador_times_net
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /home/ubuntu/nginx.conf:/etc/nginx/nginx.conf:ro
+      - /home/ubuntu/certbot/conf:/etc/letsencrypt:ro
+      - /home/ubuntu/certbot/www:/var/www/certbot:ro
+    depends_on:
+      - app
+    networks:
+      - gerador_times_net
+
+networks:
+  gerador_times_net:
+    driver: bridge
