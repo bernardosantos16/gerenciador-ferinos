@@ -52,11 +52,11 @@ public class SecurityConfig {
                                 response.sendError(HttpServletResponse.SC_UNAUTHORIZED)
                 ))
                 .headers(headers -> headers
+                        .frameOptions(frame -> frame.disable())
+                        .xssProtection(xss -> xss.disable())
+                        .httpStrictTransportSecurity(hsts -> hsts.disable())
+                        .contentTypeOptions(cto -> cto.disable())
                         .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src 'self' data:; font-src 'self'; frame-ancestors 'none';"))
-                        .httpStrictTransportSecurity(hsts -> hsts
-                                .includeSubDomains(true)
-                                .maxAgeInSeconds(31536000))
-                        .contentTypeOptions(Customizer.withDefaults())
                 )
                 .authorizeHttpRequests(auth -> auth
                         // Swagger / OpenAPI
