@@ -7,6 +7,12 @@ services:
       - /home/ubuntu/gerador-times.env
     environment:
       - SPRING_PROFILES_ACTIVE=prod
+      - OTEL_SERVICE_NAME=gerador-times
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=none
+      - OTEL_LOGS_EXPORTER=none
     expose:
       - "8080"
     networks:
