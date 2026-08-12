@@ -13,7 +13,7 @@ datasources:
         spanStartTimeShift: '-1h'
         spanEndTimeShift: '1h'
         customQuery: true
-        query: '{container=~".+"} |= "${__trace.traceId}"'
+        query: '{container=~".+"} |= "$${__trace.traceId}"'
 
   - name: Loki
     type: loki
