@@ -1,0 +1,73 @@
+groups:
+  - name: service-availability
+    rules:
+      - alert: ServiceDown
+        expr: absent(target_info{job="gerador-times"})
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "gerador-times está fora do ar"
+          description: "O serviço gerador-times não exporta métricas há 2 minutos."
+
+      - alert: ServiceDown
+        expr: absent(target_info{job="email-service"})
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "email-service está fora do ar"
+          description: "O serviço email-service não exporta métricas há 2 minutos."
+
+  - name: http
+    rules:
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m]))
+            /
+          sum(rate(http_server_request_duration_seconds_count[5m]))
+            > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Taxa de erro HTTP 5xx acima de 5%"
+          description: "A taxa de respostas 5xx está acima de 5% nos últimos 5 minutos."
+
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_server_request_duration_seconds_bucket[5m])) by (le)
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Latência p95 acima de 2 segundos"
+          description: "A latência p95 das requisições HTTP está acima de 2 segundos."
+
+  - name: database
+    rules:
+      - alert: DBConnectionPoolExhausted
+        expr: db_client_connections_pending_requests > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pool de conexões do banco esgotado"
+          description: "Há requisições aguardando conexão no pool do banco ({{ $labels.job }})."
+
+  - name: jvm
+    rules:
+      - alert: HighHeapUsage
+        expr: |
+          sum(jvm_memory_used_bytes{jvm_memory_type="heap"}) by (job)
+            /
+          sum(jvm_memory_committed_bytes{jvm_memory_type="heap"}) by (job)
+            > 0.95
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Heap da JVM acima de 95%"
+          description: "O heap da JVM de {{ $labels.job }} está acima de 95% do tamanho commitado."

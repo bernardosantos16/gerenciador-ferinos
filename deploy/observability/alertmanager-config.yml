@@ -1,0 +1,19 @@
+route:
+  receiver: 'default'
+  group_by: ['alertname']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+receivers:
+  # Sem canal de notificação externo por enquanto: os alertas ficam
+  # retidos e visíveis na UI do Alertmanager e via API.
+  #
+  # Para adicionar notificações (Slack, Telegram, e-mail, webhook), adicione
+  # um receiver abaixo e referencie-o na rota. Exemplo:
+  #
+  # - name: 'slack'
+  #   slack_configs:
+  #     - api_url: '<webhook-url>'
+  #       channel: '#alerts'
+  - name: 'default'
