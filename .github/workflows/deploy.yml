@@ -109,7 +109,7 @@ jobs:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_KEY }}
-          source: "deploy/nginx.conf,deploy/docker-compose.yml"
+          source: "deploy/nginx.conf,deploy/docker-compose.yml,deploy/observability"
           target: /home/ubuntu
           strip_components: 1
 

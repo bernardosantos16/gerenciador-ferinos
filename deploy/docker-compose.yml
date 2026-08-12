@@ -28,6 +28,83 @@ services:
     networks:
       - gerador_times_net
 
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-collector
+    restart: unless-stopped
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - /home/ubuntu/observability/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    depends_on:
+      - tempo
+      - loki
+    networks:
+      - gerador_times_net
+
+  tempo:
+    image: grafana/tempo:latest
+    container_name: tempo
+    restart: unless-stopped
+    command: ["-config.file=/etc/tempo-config.yaml"]
+    volumes:
+      - /home/ubuntu/observability/tempo-config.yaml:/etc/tempo-config.yaml:ro
+      - tempo_data:/var/tempo
+    networks:
+      - gerador_times_net
+
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki-config.yaml"]
+    volumes:
+      - /home/ubuntu/observability/loki-config.yaml:/etc/loki-config.yaml:ro
+      - loki_data:/loki
+    networks:
+      - gerador_times_net
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    command: ["--config.file=/etc/prometheus/prometheus.yml"]
+    volumes:
+      - /home/ubuntu/observability/prometheus-config.yaml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - gerador_times_net
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    restart: unless-stopped
+    command: ["-config.file=/etc/promtail-config.yaml"]
+    volumes:
+      - /home/ubuntu/observability/promtail-config.yaml:/etc/promtail-config.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - gerador_times_net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - /home/ubuntu/observability/grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - /home/ubuntu/observability/grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+    networks:
+      - gerador_times_net
+
 networks:
   gerador_times_net:
     driver: bridge
+
+volumes:
+  tempo_data:
+  loki_data:
+  prometheus_data:
+  grafana_data:
