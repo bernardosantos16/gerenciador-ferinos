@@ -11,7 +11,7 @@ services:
       - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
       - OTEL_TRACES_EXPORTER=otlp
-      - OTEL_METRICS_EXPORTER=none
+      - OTEL_METRICS_EXPORTER=otlp
       - OTEL_LOGS_EXPORTER=none
     expose:
       - "8080"
@@ -30,7 +30,7 @@ services:
       - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
       - OTEL_TRACES_EXPORTER=otlp
-      - OTEL_METRICS_EXPORTER=none
+      - OTEL_METRICS_EXPORTER=otlp
       - OTEL_LOGS_EXPORTER=none
     networks:
       - gerador_times_net
@@ -120,6 +120,8 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
       - /home/ubuntu/observability/grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - /home/ubuntu/observability/grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+      - /home/ubuntu/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
     networks:
       - gerador_times_net
 
