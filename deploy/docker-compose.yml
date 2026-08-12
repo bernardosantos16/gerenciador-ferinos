@@ -92,7 +92,7 @@ services:
       - gerador_times_net
 
   grafana:
-    image: grafana/grafana:11.5.2
+    image: grafana/grafana:11.5.4
     container_name: grafana
     restart: unless-stopped
     environment:
@@ -101,7 +101,6 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
       - /home/ubuntu/observability/grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
-      - /home/ubuntu/observability/grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
     networks:
       - gerador_times_net
 
