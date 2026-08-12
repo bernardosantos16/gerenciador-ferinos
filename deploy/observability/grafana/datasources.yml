@@ -12,8 +12,8 @@ datasources:
         datasourceUid: loki
         spanStartTimeShift: '-1h'
         spanEndTimeShift: '1h'
-        filterByTraceID: true
-        filterBySpanID: false
+        customQuery: true
+        query: '{container=~".+"} |= "${__trace.traceId}"'
 
   - name: Loki
     type: loki
