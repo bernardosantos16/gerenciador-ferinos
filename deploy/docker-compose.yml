@@ -29,7 +29,7 @@ services:
       - gerador_times_net
 
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:latest
+    image: otel/opentelemetry-collector-contrib:0.120.0
     container_name: otel-collector
     restart: unless-stopped
     command: ["--config=/etc/otel-collector-config.yaml"]
@@ -42,7 +42,7 @@ services:
       - gerador_times_net
 
   tempo:
-    image: grafana/tempo:latest
+    image: grafana/tempo:2.7.1
     container_name: tempo
     restart: unless-stopped
     command: ["-config.file=/etc/tempo-config.yaml"]
@@ -53,7 +53,7 @@ services:
       - gerador_times_net
 
   loki:
-    image: grafana/loki:latest
+    image: grafana/loki:3.4.3
     container_name: loki
     restart: unless-stopped
     command: ["-config.file=/etc/loki-config.yaml"]
@@ -64,7 +64,7 @@ services:
       - gerador_times_net
 
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.2.1
     container_name: prometheus
     restart: unless-stopped
     command: ["--config.file=/etc/prometheus/prometheus.yml"]
@@ -75,7 +75,7 @@ services:
       - gerador_times_net
 
   promtail:
-    image: grafana/promtail:latest
+    image: grafana/promtail:3.4.3
     container_name: promtail
     restart: unless-stopped
     command: ["-config.file=/etc/promtail-config.yaml"]
@@ -86,7 +86,7 @@ services:
       - gerador_times_net
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:11.5.2
     container_name: grafana
     restart: unless-stopped
     environment:
