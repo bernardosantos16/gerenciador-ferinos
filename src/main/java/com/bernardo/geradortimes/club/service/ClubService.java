@@ -64,8 +64,8 @@ public class ClubService {
                 : requestDTO.nickname();
 
         Club club = Club.create(
-                requestDTO.name(),
-                Nickname.of(nicknameValue)
+                requestDTO.name().trim(),
+                Nickname.of(nicknameValue.trim())
         );
         Club saved = clubRepository.save(club);
 
@@ -100,10 +100,10 @@ public class ClubService {
         clubAuthorizationService.requireDirector(clubId);
 
         if (request.name() != null && !request.name().isBlank()) {
-            club.changeName(request.name());
+            club.changeName(request.name().trim());
         }
         if (request.nickname() != null && !request.nickname().isBlank()) {
-            club.changeNickname(Nickname.of(request.nickname()));
+            club.changeNickname(Nickname.of(request.nickname().trim()));
         }
 
         Club saved = clubRepository.save(club);
