@@ -50,13 +50,11 @@ public class AuthService {
             // Timing defense: run Argon2 hash even for unknown users
             // so that response time is indistinguishable from valid-user/wrong-password.
             passwordService.hash("dummy-timing-defense");
-            log.warn("Login falhou - credencial inexistente - login: {}", LogSanitizer.maskEmail(loginTrimmed));
             throw invalidCredentials();
         }
 
         boolean ok = passwordService.matches(request.password(), user.getPassword().getValue());
         if (!ok) {
-            log.warn("Login falhou - senha invalida - userId: {}", user.getId());
             throw invalidCredentials();
         }
 
