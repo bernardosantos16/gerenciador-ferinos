@@ -18,6 +18,23 @@ services:
     networks:
       - gerador_times_net
 
+  email-service:
+    image: ${DOCKER_USERNAME}/email-service:latest
+    container_name: email-service
+    restart: unless-stopped
+    env_file:
+      - /home/ubuntu/email-service.env
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - OTEL_SERVICE_NAME=email-service
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=none
+      - OTEL_LOGS_EXPORTER=none
+    networks:
+      - gerador_times_net
+
   nginx:
     image: nginx:alpine
     container_name: nginx
