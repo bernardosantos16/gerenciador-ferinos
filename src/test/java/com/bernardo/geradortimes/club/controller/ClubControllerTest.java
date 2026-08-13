@@ -52,7 +52,7 @@ class ClubControllerTest extends IntegrationTestBase {
         }
 
         @Test
-        @DisplayName("deve usar nome como fallback de nickname quando nickname é nulo")
+        @DisplayName("deve retornar 400 quando nickname é nulo")
         void createWithNullNickname() throws Exception {
             User user = createActiveUser("creator2@club.com", "creator2_nick");
 
@@ -65,9 +65,7 @@ class ClubControllerTest extends IntegrationTestBase {
                             .header("Authorization", bearerToken(user))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(toJson(request)))
-                    .andExpect(status().isCreated())
-                    .andExpect(jsonPath("$.name", is("Clube Teste")))
-                    .andExpect(jsonPath("$.nickname", is("Clube Teste")));
+                    .andExpect(status().isBadRequest());
         }
 
         @Test
@@ -119,6 +117,58 @@ class ClubControllerTest extends IntegrationTestBase {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(toJson(request)))
                     .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("deve retornar 400 quando nickname contém espaço")
+        void createNicknameWithSpace() throws Exception {
+            User user = createActiveUser("creator_space@club.com", "creator_space");
+
+            var request = new CreateClubRequestDTO(
+                    "Clube Válido",
+                    "meu clube"
+            );
+
+            mockMvc.perform(post("/api/clubs")
+                            .header("Authorization", bearerToken(user))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(request)))
+                    .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("deve retornar 400 quando nickname contém maiúsculas")
+        void createNicknameUppercase() throws Exception {
+            User user = createActiveUser("creator_upper@club.com", "creator_upper");
+
+            var request = new CreateClubRequestDTO(
+                    "Clube Válido",
+                    "MeuClube"
+            );
+
+            mockMvc.perform(post("/api/clubs")
+                            .header("Authorization", bearerToken(user))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(request)))
+                    .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("deve retornar 409 quando nickname já existe")
+        void createDuplicateNickname() throws Exception {
+            User user = createActiveUser("creator_dup@club.com", "creator_dup");
+            createClub("Clube Existente", "existing_nick");
+
+            var request = new CreateClubRequestDTO(
+                    "Clube Novo",
+                    "existing_nick"
+            );
+
+            mockMvc.perform(post("/api/clubs")
+                            .header("Authorization", bearerToken(user))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(request)))
+                    .andExpect(status().isConflict());
         }
 
         @Test
@@ -429,6 +479,83 @@ class ClubControllerTest extends IntegrationTestBase {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(toJson(request)))
                     .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("deve retornar 409 quando nickname alterado já existe em outro clube")
+        void updateDuplicateNickname() throws Exception {
+            User director = createActiveUser("update_dup@club.com", "update_dup");
+            Club club = createClub("Club A", "club_a_nick");
+            createClub("Club B", "club_b_nick");
+            createClubMember(director.getId(), club.getId(), ClubRole.DIRECTOR);
+
+            var request = new UpdateClubRequestDTO(
+                    "Club A Renamed",
+                    "club_b_nick"
+            );
+
+            mockMvc.perform(patch("/api/clubs/{id}", club.getId())
+                            .header("Authorization", bearerToken(director))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(request)))
+                    .andExpect(status().isConflict());
+        }
+
+        @Test
+        @DisplayName("deve permitir manter o próprio nickname ao atualizar")
+        void updateKeepOwnNickname() throws Exception {
+            User director = createActiveUser("update_keep@club.com", "update_keep");
+            Club club = createClub("Club Keep", "keep_nick");
+            createClubMember(director.getId(), club.getId(), ClubRole.DIRECTOR);
+
+            var request = new UpdateClubRequestDTO(
+                    "Club Keep Renamed",
+                    "keep_nick"
+            );
+
+            mockMvc.perform(patch("/api/clubs/{id}", club.getId())
+                            .header("Authorization", bearerToken(director))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(toJson(request)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.nickname", is("keep_nick")));
+        }
+    }
+
+    // ── GET /api/clubs/nickname/{nickname}/available ──────────────────────────
+
+    @Nested
+    @DisplayName("GET /api/clubs/nickname/{nickname}/available")
+    class NicknameAvailable {
+
+        @Test
+        @DisplayName("deve retornar available=true quando nickname não existe")
+        void availableTrue() throws Exception {
+            User user = createActiveUser("avail_true@club.com", "avail_true");
+
+            mockMvc.perform(get("/api/clubs/nickname/{nickname}/available", "livre_nick")
+                            .header("Authorization", bearerToken(user)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.available", is(true)));
+        }
+
+        @Test
+        @DisplayName("deve retornar available=false quando nickname já existe")
+        void availableFalse() throws Exception {
+            User user = createActiveUser("avail_false@club.com", "avail_false");
+            createClub("Clube Existente", "ocupado_nick");
+
+            mockMvc.perform(get("/api/clubs/nickname/{nickname}/available", "ocupado_nick")
+                            .header("Authorization", bearerToken(user)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.available", is(false)));
+        }
+
+        @Test
+        @DisplayName("deve retornar 401 quando não autenticado")
+        void availableUnauthorized() throws Exception {
+            mockMvc.perform(get("/api/clubs/nickname/{nickname}/available", "qualquer"))
+                    .andExpect(status().isUnauthorized());
         }
     }
 

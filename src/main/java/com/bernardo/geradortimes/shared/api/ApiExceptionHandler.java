@@ -40,8 +40,8 @@ public class ApiExceptionHandler {
                 .map(error -> new ValidationError("global", error.getDefaultMessage()))
                 .toList());
         pd.setProperty("errors", toFieldErrors(errors));
-        log.debug("Validacao de entrada falhou - errorType: METHOD_ARGUMENT_NOT_VALID, fieldCount: {}, path: {}",
-                errors.size(), request.getRequestURI());
+        log.info("Validacao de entrada falhou - errorType: METHOD_ARGUMENT_NOT_VALID, errors: {}, path: {}",
+                errors.stream().map(e -> e.field() + "=" + e.message()).toList(), request.getRequestURI());
         return pd;
     }
 
@@ -52,8 +52,8 @@ public class ApiExceptionHandler {
                 .map(ApiExceptionHandler::toValidationError)
                 .toList();
         pd.setProperty("errors", toFieldErrors(errors));
-        log.debug("Validacao de entrada falhou - errorType: CONSTRAINT_VIOLATION, fieldCount: {}, path: {}",
-                errors.size(), request.getRequestURI());
+        log.info("Validacao de entrada falhou - errorType: CONSTRAINT_VIOLATION, errors: {}, path: {}",
+                errors.stream().map(e -> e.field() + "=" + e.message()).toList(), request.getRequestURI());
         return pd;
     }
 
@@ -64,7 +64,7 @@ public class ApiExceptionHandler {
                 ? "invalid value"
                 : "invalid value for type " + ex.getRequiredType().getSimpleName();
         pd.setProperty("errors", List.of(new FieldErrorResponse(ex.getName(), message)));
-        log.debug("Validacao de entrada falhou - errorType: TYPE_MISMATCH, field: {}, path: {}",
+        log.info("Validacao de entrada falhou - errorType: TYPE_MISMATCH, field: {}, path: {}",
                 ex.getName(), request.getRequestURI());
         return pd;
     }
@@ -73,7 +73,7 @@ public class ApiExceptionHandler {
     public ProblemDetail handleMissingServletRequestParameter(MissingServletRequestParameterException ex, HttpServletRequest request) {
         ProblemDetail pd = buildValidationProblemDetail(request);
         pd.setProperty("errors", List.of(new FieldErrorResponse(ex.getParameterName(), "parameter is required")));
-        log.debug("Validacao de entrada falhou - errorType: MISSING_PARAMETER, parameter: {}, path: {}",
+        log.info("Validacao de entrada falhou - errorType: MISSING_PARAMETER, parameter: {}, path: {}",
                 ex.getParameterName(), request.getRequestURI());
         return pd;
     }
@@ -86,20 +86,20 @@ public class ApiExceptionHandler {
         if (cause instanceof InvalidFormatException invalidFormat) {
             String field = extractJsonField(invalidFormat.getPath());
             pd.setProperty("errors", List.of(new FieldErrorResponse(field, "invalid value")));
-            log.debug("Corpo da requisicao invalido - errorType: INVALID_FORMAT, field: {}, path: {}",
+            log.info("Corpo da requisicao invalido - errorType: INVALID_FORMAT, field: {}, path: {}",
                     field, request.getRequestURI());
             return pd;
         }
         if (cause instanceof MismatchedInputException mismatchedInput) {
             String field = extractJsonField(mismatchedInput.getPath());
             pd.setProperty("errors", List.of(new FieldErrorResponse(field, "invalid value")));
-            log.debug("Corpo da requisicao invalido - errorType: MISMATCHED_INPUT, field: {}, path: {}",
+            log.info("Corpo da requisicao invalido - errorType: MISMATCHED_INPUT, field: {}, path: {}",
                     field, request.getRequestURI());
             return pd;
         }
 
         pd.setProperty("errors", List.of(new FieldErrorResponse("body", "invalid request body")));
-        log.debug("Corpo da requisicao invalido - errorType: UNREADABLE_BODY, path: {}", request.getRequestURI());
+        log.info("Corpo da requisicao invalido - errorType: UNREADABLE_BODY, path: {}", request.getRequestURI());
         return pd;
     }
 
@@ -115,7 +115,7 @@ public class ApiExceptionHandler {
             log.warn("Requisicao rejeitada por conflito - status: {}, field: {}, path: {}",
                     ex.getStatus(), ex.getField(), request.getRequestURI());
         } else {
-            log.debug("Requisicao rejeitada por regra de negocio - status: {}, field: {}, path: {}",
+            log.info("Requisicao rejeitada por regra de negocio - status: {}, field: {}, path: {}",
                     ex.getStatus(), ex.getField(), request.getRequestURI());
         }
         return pd;

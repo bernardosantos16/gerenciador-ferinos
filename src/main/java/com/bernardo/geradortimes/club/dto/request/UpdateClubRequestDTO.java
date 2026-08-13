@@ -1,7 +1,7 @@
 package com.bernardo.geradortimes.club.dto.request;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Pattern;
 
 public record UpdateClubRequestDTO(
 
@@ -13,13 +13,13 @@ public record UpdateClubRequestDTO(
         String name,
 
         @Schema(
-                description = "Novo apelido do clube.",
+                description = "Novo apelido do clube. Vazio ou nulo mantém o atual.",
                 example = "ferino",
                 minLength = 3,
                 maxLength = 24,
                 nullable = true
         )
-        @Size(min = 3, max = 24)
+        @Pattern(regexp = "^$|[a-z0-9_-]{3,24}$", message = "nickname deve ter de 3 a 24 caracteres (minúsculas, números, _ ou -)")
         String nickname
 ) {
 }

@@ -3,7 +3,7 @@ package com.bernardo.geradortimes.club.dto.request;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Pattern;
 
 public record CreateClubRequestDTO(
 
@@ -16,13 +16,14 @@ public record CreateClubRequestDTO(
         String name,
 
         @Schema(
-                description = "Apelido do clube para exibicao. Se nao informado, o backend usa o `name` como fallback.",
+                description = "Apelido do clube para exibicao.",
                 example = "ferino",
                 minLength = 3,
                 maxLength = 24,
-                nullable = true
+                nullable = false
         )
-        @Size(min = 3, max = 24)
+        @NotBlank
+        @Pattern(regexp = "^[a-z0-9_-]{3,24}$", message = "nickname deve ter de 3 a 24 caracteres (minúsculas, números, _ ou -)")
         String nickname
 ) {
 }

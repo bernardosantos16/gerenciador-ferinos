@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -85,6 +86,22 @@ public class ClubController {
     ){
         var response = clubService.getClubByNickname(nickname);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("nickname/{nickname}/available")
+    @Operation(
+            summary = "Verificar disponibilidade de nickname",
+            description = "Retorna se o nickname informado está disponível para uso."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Disponibilidade verificada."),
+            @ApiResponse(responseCode = "401", description = "Nao autenticado.")
+    })
+    public ResponseEntity<Map<String, Boolean>> isNicknameAvailable(
+            @Parameter(description = "nickname a verificar.", required = true, example = "ferino")
+            @PathVariable String nickname
+    ) {
+        return ResponseEntity.ok(Map.of("available", clubService.isNicknameAvailable(nickname)));
     }
 
     @GetMapping

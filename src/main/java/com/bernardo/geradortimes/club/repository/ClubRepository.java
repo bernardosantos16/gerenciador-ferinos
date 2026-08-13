@@ -11,4 +11,8 @@ import java.util.UUID;
 @Repository
 public interface ClubRepository extends JpaRepository<Club, UUID> {
     Optional<Club> findByNicknameValue(String nickname);
+
+    boolean existsByNicknameValue(String nickname);
+
+    boolean existsByNicknameValueAndIdNot(String nickname, UUID id);
 }

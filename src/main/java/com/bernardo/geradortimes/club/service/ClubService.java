@@ -8,6 +8,7 @@ import com.bernardo.geradortimes.club.model.Club;
 import com.bernardo.geradortimes.club.repository.ClubMemberRepository;
 import com.bernardo.geradortimes.club.repository.ClubRepository;
 import com.bernardo.geradortimes.match.service.MatchService;
+import com.bernardo.geradortimes.shared.api.FieldValidationException;
 import com.bernardo.geradortimes.shared.enums.ClubRole;
 import com.bernardo.geradortimes.shared.value_object.Nickname;
 import com.bernardo.geradortimes.user.model.User;
@@ -20,6 +21,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.List;
 import java.util.UUID;
 
+import static org.springframework.http.HttpStatus.CONFLICT;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 
@@ -59,13 +61,15 @@ public class ClubService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(UNAUTHORIZED, "unauthorized"));
 
-        String nicknameValue = requestDTO.nickname() == null || requestDTO.nickname().isBlank()
-                ? requestDTO.name()
-                : requestDTO.nickname();
+        String nicknameValue = requestDTO.nickname().trim();
+        if (clubRepository.existsByNicknameValue(nicknameValue)) {
+            log.warn("Criacao de clube rejeitada - conflictField: nickname, conflictReason: ALREADY_EXISTS");
+            throw new FieldValidationException(CONFLICT, "nickname", "nickname already exists");
+        }
 
         Club club = Club.create(
                 requestDTO.name().trim(),
-                Nickname.of(nicknameValue.trim())
+                Nickname.of(nicknameValue)
         );
         Club saved = clubRepository.save(club);
 
@@ -92,6 +96,10 @@ public class ClubService {
         return new ClubResponseDTO(club.getId(), club.getName(), club.getNickname().getValue());
     }
 
+    public boolean isNicknameAvailable(String nickname) {
+        return !clubRepository.existsByNicknameValue(nickname.trim());
+    }
+
     @Transactional
     public ClubResponseDTO update(UUID clubId, UpdateClubRequestDTO request) {
         Club club = clubRepository.findById(clubId)
@@ -103,7 +111,12 @@ public class ClubService {
             club.changeName(request.name().trim());
         }
         if (request.nickname() != null && !request.nickname().isBlank()) {
-            club.changeNickname(Nickname.of(request.nickname().trim()));
+            String nicknameValue = request.nickname().trim();
+            if (clubRepository.existsByNicknameValueAndIdNot(nicknameValue, clubId)) {
+                log.warn("Atualizacao de clube rejeitada - conflictField: nickname, conflictReason: ALREADY_EXISTS");
+                throw new FieldValidationException(CONFLICT, "nickname", "nickname already exists");
+            }
+            club.changeNickname(Nickname.of(nicknameValue));
         }
 
         Club saved = clubRepository.save(club);
