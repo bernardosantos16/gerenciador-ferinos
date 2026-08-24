@@ -10,6 +10,7 @@ import com.bernardo.geradortimes.club.repository.ClubRepository;
 import com.bernardo.geradortimes.match.service.MatchService;
 import com.bernardo.geradortimes.shared.api.FieldValidationException;
 import com.bernardo.geradortimes.shared.enums.ClubRole;
+import com.bernardo.geradortimes.shared.enums.JoinPolicy;
 import com.bernardo.geradortimes.shared.value_object.Nickname;
 import com.bernardo.geradortimes.user.model.User;
 import com.bernardo.geradortimes.user.repository.UserRepository;
@@ -21,6 +22,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.List;
 import java.util.UUID;
 
+import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.CONFLICT;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 import static org.springframework.http.HttpStatus.UNAUTHORIZED;
@@ -29,6 +31,9 @@ import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 @Service
 @Transactional
 public class ClubService {
+
+    private static final int SEARCH_LIMIT = 20;
+    private static final int SEARCH_MAX_LENGTH = 100;
 
     private final ClubRepository clubRepository;
     private final ClubMemberService clubMemberService;
@@ -76,7 +81,7 @@ public class ClubService {
         // The creator is always a DIRECTOR in the club.
         clubMemberService.createDirectorMember(userId, saved.getId(), user.getName());
         log.info("Clube criado - clubId: {}, userId: {}", saved.getId(), userId);
-        return new ClubResponseDTO(saved.getId(), saved.getName(), saved.getNickname().getValue());
+        return new ClubResponseDTO(saved.getId(), saved.getName(), saved.getNickname().getValue(), saved.getJoinPolicy());
     }
 
 
@@ -85,7 +90,7 @@ public class ClubService {
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "club not found"));
         clubAuthorizationService.requireMember(id);
 
-        return new ClubResponseDTO(club.getId(), club.getName(), club.getNickname().getValue());
+        return new ClubResponseDTO(club.getId(), club.getName(), club.getNickname().getValue(), club.getJoinPolicy());
     }
 
     public ClubResponseDTO getClubByNickname(String nickname) {
@@ -93,11 +98,34 @@ public class ClubService {
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "club not found"));
         clubAuthorizationService.requireMember(club.getId());
 
-        return new ClubResponseDTO(club.getId(), club.getName(), club.getNickname().getValue());
+        return new ClubResponseDTO(club.getId(), club.getName(), club.getNickname().getValue(), club.getJoinPolicy());
     }
 
     public boolean isNicknameAvailable(String nickname) {
         return !clubRepository.existsByNicknameValue(nickname.trim());
+    }
+
+    public List<ClubResponseDTO> search(String term) {
+        if (term == null || term.isBlank()) {
+            return List.of();
+        }
+        String trimmed = term.trim();
+        if (trimmed.length() > SEARCH_MAX_LENGTH) {
+            throw new FieldValidationException(BAD_REQUEST, "q", "search term must have at most " + SEARCH_MAX_LENGTH + " characters");
+        }
+        String pattern = "%" + escapeLike(trimmed) + "%";
+        List<Club> clubs = clubRepository.searchActive(pattern, SEARCH_LIMIT);
+        return clubs.stream()
+                .map(club -> new ClubResponseDTO(
+                        club.getId(),
+                        club.getName(),
+                        club.getNickname().getValue(),
+                        club.getJoinPolicy()))
+                .toList();
+    }
+
+    private static String escapeLike(String value) {
+        return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 
     @Transactional
@@ -119,9 +147,13 @@ public class ClubService {
             club.changeNickname(Nickname.of(nicknameValue));
         }
 
+        if (request.joinPolicy() != null) {
+            club.changeJoinPolicy(request.joinPolicy());
+        }
+
         Club saved = clubRepository.save(club);
         log.info("Clube atualizado - clubId: {}", saved.getId());
-        return new ClubResponseDTO(saved.getId(), saved.getName(), saved.getNickname().getValue());
+        return new ClubResponseDTO(saved.getId(), saved.getName(), saved.getNickname().getValue(), saved.getJoinPolicy());
     }
 
     @Transactional
@@ -134,14 +166,14 @@ public class ClubService {
         club.deactivate();
         clubRepository.save(club);
         log.info("Clube desativado (soft-delete) - clubId: {}", club.getId());
-        return new ClubResponseDTO(club.getId(), club.getName(), club.getNickname().getValue());
+        return new ClubResponseDTO(club.getId(), club.getName(), club.getNickname().getValue(), club.getJoinPolicy());
     }
 
     public List<ClubResponseDTO> listUserClubs(ClubRole clubRole) {
         UUID userId = currentUserService.requireUserId();
         List<Club> clubs = clubMemberRepository.findByUserIdAndClubRole(userId, clubRole);
         return clubs.stream()
-                .map(club -> new ClubResponseDTO(club.getId(), club.getName(), club.getNickname().getValue()))
+                .map(club -> new ClubResponseDTO(club.getId(), club.getName(), club.getNickname().getValue(), club.getJoinPolicy()))
                 .toList();
     }
 }

@@ -88,6 +88,22 @@ public class ClubController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/search")
+    @Operation(
+            summary = "Buscar clubes ativos por nome ou nickname",
+            description = "Busca clubes com status ACTIVE cujo nome ou nickname contem o termo informado."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Clubes encontrados.",
+                    content = @Content(schema = @Schema(implementation = ClubResponseDTO.class))),
+            @ApiResponse(responseCode = "401", description = "Nao autenticado.")
+    })
+    public ResponseEntity<List<ClubResponseDTO>> search(
+            @Parameter(description = "Termo de busca.", required = true, example = "ferino")
+            @RequestParam String q
+    ) {
+        return ResponseEntity.ok(clubService.search(q));
+    }
     @GetMapping("nickname/{nickname}/available")
     @Operation(
             summary = "Verificar disponibilidade de nickname",

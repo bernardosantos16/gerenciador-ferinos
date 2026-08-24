@@ -217,6 +217,11 @@ public class ApiExceptionHandler {
             case "login already exists" -> "login";
             case "email already registered" -> "login";
             case "invalid or expired verification token" -> "token";
+            case "invalid or expired invite token" -> "token";
+            case "invite token required" -> "token";
+            case "already a member or pending" -> "membership";
+            case "membership request already decided" -> "membership";
+            case "club is not active" -> "club";
             default -> "global";
         };
     }

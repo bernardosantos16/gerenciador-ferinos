@@ -22,6 +22,7 @@ public interface ClubMemberRepository extends JpaRepository<ClubMember, Long> {
     boolean existsByClubIdAndUserIdAndClubRole(UUID clubId, UUID userId, ClubRole clubRole);
     List<ClubMember> findByClubIdAndIdIn(UUID clubId, Collection<Long> ids);
     Page<ClubMember> findByClubId(UUID clubId, Pageable pageable);
+    List<ClubMember> findByClubIdAndClubRole(UUID clubId, ClubRole clubRole);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select cm from ClubMember cm where cm.id = :id")

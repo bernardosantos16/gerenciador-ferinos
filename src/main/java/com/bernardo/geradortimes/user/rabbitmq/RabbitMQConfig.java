@@ -30,6 +30,15 @@ public class RabbitMQConfig {
     @Value("${app.rabbitmq.password-reset.routing-key:user.password-reset}")
     private String passwordResetRoutingKey;
 
+    @Value("${app.rabbitmq.club.exchange:club.events}")
+    private String clubExchangeName;
+
+    @Value("${app.rabbitmq.club.membership-request.queue:club.membership.request.queue}")
+    private String clubMembershipRequestQueueName;
+
+    @Value("${app.rabbitmq.club.membership-request.routing-key:club.membership-requested}")
+    private String clubMembershipRequestRoutingKey;
+
     @Bean
     public JacksonJsonMessageConverter jsonMessageConverter() {
         return new JacksonJsonMessageConverter();
@@ -66,5 +75,20 @@ public class RabbitMQConfig {
     @Bean
     public Binding emailVerificationBinding(Queue userEmailVerificationQueue, TopicExchange userExchange) {
         return BindingBuilder.bind(userEmailVerificationQueue).to(userExchange).with(emailVerificationRoutingKey);
+    }
+
+    @Bean
+    public TopicExchange clubExchange() {
+        return new TopicExchange(clubExchangeName);
+    }
+
+    @Bean
+    public Queue clubMembershipRequestQueue() {
+        return new Queue(clubMembershipRequestQueueName, true);
+    }
+
+    @Bean
+    public Binding clubMembershipRequestBinding(Queue clubMembershipRequestQueue, TopicExchange clubExchange) {
+        return BindingBuilder.bind(clubMembershipRequestQueue).to(clubExchange).with(clubMembershipRequestRoutingKey);
     }
 }

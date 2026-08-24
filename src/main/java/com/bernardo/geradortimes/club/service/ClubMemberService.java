@@ -48,6 +48,21 @@ public class ClubMemberService {
         log.info("Membro diretor criado - clubId: {}, userId: {}", clubId, userId);
     }
 
+    public void createUserMember(UUID userId, UUID clubId, String name) {
+        ClubMember clubMember = ClubMember.create(
+                userId,
+                clubId,
+                name,
+                3,
+                0,
+                0,
+                null,
+                ClubRole.MEMBER
+        );
+        clubMemberRepository.save(clubMember);
+        log.info("Membro usuario criado - clubId: {}, userId: {}", clubId, userId);
+    }
+
 
     public ClubMemberResponseDTO addNonUserClubMember(UUID clubId, AddClubMemberRequestDTO requestDTO) {
         clubAuthorizationService.requireDirector(clubId);

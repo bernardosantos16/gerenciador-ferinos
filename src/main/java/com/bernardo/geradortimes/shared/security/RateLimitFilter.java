@@ -39,7 +39,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
             "/api/users/verify-email",
             "/api/users/forgot-password",
             "/api/users/reset-password",
-            "/api/teams/generate"
+            "/api/teams/generate",
+            "/api/clubs/invite"
     );
 
     private final RateLimitProperties properties;
@@ -51,14 +52,29 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     private boolean shouldRateLimit(HttpServletRequest request) {
         return "POST".equalsIgnoreCase(request.getMethod())
-                && PROTECTED_URIS.contains(request.getRequestURI());
+                && PROTECTED_URIS.contains(canonicalUri(request.getRequestURI()));
+    }
+
+    /**
+     * Normaliza URIs dinamicas para um caminho canonico usado no rate limit.
+     * Ex.: {@code /api/clubs/{clubId}/invite} vira {@code /api/clubs/invite},
+     * evitando que o clubId fragmente o contador.
+     */
+    private String canonicalUri(String uri) {
+        String[] parts = uri.split("/");
+        if (parts.length >= 5
+                && "api".equals(parts[1])
+                && "clubs".equals(parts[2])
+                && "invite".equals(parts[4])) {
+            return "/api/clubs/invite";
+        }
+        return uri;
     }
 
     private String getClientIp(HttpServletRequest request) {
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isBlank()) {
-            return xForwardedFor.split(",")[0].trim();
-        }
+        // Em prod, server.forward-headers-strategy=framework faz o ForwardedHeaderFilter
+        // reescrever getRemoteAddr() a partir do proxy confiavel. Nao confiamos no
+        // header X-Forwarded-For enviado pelo proprio cliente.
         return request.getRemoteAddr();
     }
 
@@ -90,7 +106,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
 
         String ip = getClientIp(request);
-        String uri = request.getRequestURI();
+        String uri = canonicalUri(request.getRequestURI());
         String key = ip + "|" + uri;
         long now = System.currentTimeMillis();
 

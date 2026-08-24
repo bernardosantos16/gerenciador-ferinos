@@ -1,7 +1,7 @@
 package com.bernardo.geradortimes.club.model;
 
 import com.bernardo.geradortimes.shared.enums.ActivityStatus;
-import com.bernardo.geradortimes.shared.value_object.HexColor;
+import com.bernardo.geradortimes.shared.enums.JoinPolicy;
 import com.bernardo.geradortimes.shared.value_object.Nickname;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -29,13 +29,18 @@ public class Club {
     @Enumerated(EnumType.STRING)
     private ActivityStatus status;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "join_policy")
+    private JoinPolicy joinPolicy;
+
     protected Club() {}
 
-    private Club(String name, Nickname nickname, Instant createdAt, ActivityStatus status) {
+    private Club(String name, Nickname nickname, Instant createdAt, ActivityStatus status, JoinPolicy joinPolicy) {
         this.name = name;
         this.nickname = nickname;
         this.createdAt = createdAt;
         this.status = status;
+        this.joinPolicy = joinPolicy;
     }
 
     public static Club create(
@@ -45,7 +50,8 @@ public class Club {
                 name,
                 nickname,
                 Instant.now(),
-                ActivityStatus.ACTIVE
+                ActivityStatus.ACTIVE,
+                JoinPolicy.INVITE_ONLY
         );
     }
 
@@ -59,6 +65,10 @@ public class Club {
 
     public void changeNickname(Nickname nickname) {
         this.nickname = nickname;
+    }
+
+    public void changeJoinPolicy(JoinPolicy joinPolicy) {
+        this.joinPolicy = joinPolicy;
     }
 
 }

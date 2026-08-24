@@ -1,5 +1,6 @@
 package com.bernardo.geradortimes.club.dto.response;
 
+import com.bernardo.geradortimes.shared.enums.JoinPolicy;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.UUID;
@@ -12,6 +13,9 @@ public record ClubResponseDTO(
         String name,
 
         @Schema(description = "Apelido do clube.", example = "ferino")
-        String nickname
+        String nickname,
+
+        @Schema(description = "Politica de ingresso do clube.", example = "INVITE_ONLY")
+        JoinPolicy joinPolicy
 ) {
 }

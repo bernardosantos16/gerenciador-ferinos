@@ -3,13 +3,19 @@ package com.bernardo.geradortimes.support;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.bernardo.geradortimes.club.model.Club;
+import com.bernardo.geradortimes.club.model.ClubInviteToken;
 import com.bernardo.geradortimes.club.model.ClubJersey;
 import com.bernardo.geradortimes.club.model.ClubMember;
+import com.bernardo.geradortimes.club.model.ClubMembershipRequest;
+import com.bernardo.geradortimes.club.repository.ClubInviteTokenRepository;
 import com.bernardo.geradortimes.club.repository.ClubJerseyRepository;
 import com.bernardo.geradortimes.club.repository.ClubMemberRepository;
+import com.bernardo.geradortimes.club.repository.ClubMembershipRequestRepository;
 import com.bernardo.geradortimes.club.repository.ClubRepository;
+import com.bernardo.geradortimes.notification.repository.NotificationRepository;
 import com.bernardo.geradortimes.shared.enums.ClubRole;
 import com.bernardo.geradortimes.shared.enums.UserRole;
+import com.bernardo.geradortimes.shared.security.AesGcmCipher;
 import com.bernardo.geradortimes.shared.value_object.Email;
 import com.bernardo.geradortimes.shared.value_object.HexColor;
 import com.bernardo.geradortimes.shared.value_object.Nickname;
@@ -40,6 +46,7 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
+import java.util.Base64;
 import java.util.HexFormat;
 import java.util.UUID;
 
@@ -80,6 +87,9 @@ public abstract class IntegrationTestBase {
     // ── Token pepper (must match test profile argon.hash.pepper) ─────────────
     protected static final String TOKEN_PEPPER = "dev-test-pepper";
 
+    // ── Invite token encryption key (must match test profile) ────────────────
+    protected static final String INVITE_TOKEN_ENCRYPTION_KEY = "DJR+WrAXDWTW9ccVpgOjVTRA/zoUdS5/a6F8j9DmyGA=";
+
     // ── Mocked external dependencies ────────────────────────────────────────
     @MockitoBean
     protected RabbitTemplate rabbitTemplate;
@@ -110,9 +120,21 @@ public abstract class IntegrationTestBase {
     @Autowired
     protected VerificationTokenRepository verificationTokenRepository;
 
+    @Autowired
+    protected ClubMembershipRequestRepository clubMembershipRequestRepository;
+
+    @Autowired
+    protected ClubInviteTokenRepository clubInviteTokenRepository;
+
+    @Autowired
+    protected NotificationRepository notificationRepository;
+
     // ── Cleanup ───────────────────────────────────────────────────────────────
     @BeforeEach
     void cleanDatabase() {
+        notificationRepository.deleteAll();
+        clubMembershipRequestRepository.deleteAll();
+        clubInviteTokenRepository.deleteAll();
         clubMemberRepository.deleteAll();
         clubJerseyRepository.deleteAll();
         clubRepository.deleteAll();
@@ -203,6 +225,39 @@ public abstract class IntegrationTestBase {
     protected ClubJersey createJersey(UUID clubId, String name, String hexColor) {
         ClubJersey jersey = ClubJersey.create(HexColor.of(hexColor), name, false, clubId);
         return clubJerseyRepository.save(jersey);
+    }
+
+    /**
+     * Generates a 6-character alphanumeric (uppercase) invite token, encrypts it
+     * (AES-GCM with the test key), persists it for the given club with a 7-day
+     * expiry, and returns the plain token.
+     */
+    protected String createInviteToken(UUID clubId) {
+        String token = generateInviteTokenValue();
+        String cipherText = AesGcmCipher.fromBase64(INVITE_TOKEN_ENCRYPTION_KEY).encrypt(token);
+        ClubInviteToken inviteToken = ClubInviteToken.create(
+                clubId,
+                cipherText,
+                Instant.now().plus(7, ChronoUnit.DAYS)
+        );
+        clubInviteTokenRepository.save(inviteToken);
+        return token;
+    }
+
+    private static String generateInviteTokenValue() {
+        String alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        StringBuilder sb = new StringBuilder(6);
+        for (int i = 0; i < 6; i++) {
+            sb.append(alphabet.charAt(new SecureRandom().nextInt(alphabet.length())));
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Creates and persists a PENDING {@link ClubMembershipRequest}.
+     */
+    protected ClubMembershipRequest createMembershipRequest(UUID clubId, UUID userId, String name, String nickname) {
+        return clubMembershipRequestRepository.save(ClubMembershipRequest.create(clubId, userId, name, nickname));
     }
 
     /**

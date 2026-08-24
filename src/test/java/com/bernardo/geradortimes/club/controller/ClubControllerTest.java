@@ -337,7 +337,8 @@ class ClubControllerTest extends IntegrationTestBase {
 
             var request = new UpdateClubRequestDTO(
                     "New Club Name",
-                    "new_nick"
+                    "new_nick",
+                    null
             );
 
             mockMvc.perform(patch("/api/clubs/{id}", club.getId())
@@ -359,6 +360,7 @@ class ClubControllerTest extends IntegrationTestBase {
 
             var request = new UpdateClubRequestDTO(
                     "Updated Name",
+                    null,
                     null
             );
 
@@ -380,7 +382,8 @@ class ClubControllerTest extends IntegrationTestBase {
 
             var request = new UpdateClubRequestDTO(
                     null,
-                    "new_nick_updated"
+                    "new_nick_updated",
+                    null
             );
 
             mockMvc.perform(patch("/api/clubs/{id}", club.getId())
@@ -401,7 +404,8 @@ class ClubControllerTest extends IntegrationTestBase {
 
             var request = new UpdateClubRequestDTO(
                     "New Name",
-                    "new_nick"
+                    "new_nick",
+                    null
             );
 
             mockMvc.perform(patch("/api/clubs/{id}", club.getId())
@@ -419,7 +423,8 @@ class ClubControllerTest extends IntegrationTestBase {
 
             var request = new UpdateClubRequestDTO(
                     "New Name",
-                    "new_nick"
+                    "new_nick",
+                    null
             );
 
             mockMvc.perform(patch("/api/clubs/{id}", club.getId())
@@ -436,7 +441,8 @@ class ClubControllerTest extends IntegrationTestBase {
 
             var request = new UpdateClubRequestDTO(
                     "New Name",
-                    "new_nick"
+                    "new_nick",
+                    null
             );
 
             mockMvc.perform(patch("/api/clubs/{id}", UUID.randomUUID())
@@ -453,7 +459,8 @@ class ClubControllerTest extends IntegrationTestBase {
 
             var request = new UpdateClubRequestDTO(
                     "New Name",
-                    "new_nick"
+                    "new_nick",
+                    null
             );
 
             mockMvc.perform(patch("/api/clubs/{id}", club.getId())
@@ -471,7 +478,8 @@ class ClubControllerTest extends IntegrationTestBase {
 
             var request = new UpdateClubRequestDTO(
                     "New Name",
-                    "ab"
+                    "ab",
+                    null
             );
 
             mockMvc.perform(patch("/api/clubs/{id}", club.getId())
@@ -491,7 +499,8 @@ class ClubControllerTest extends IntegrationTestBase {
 
             var request = new UpdateClubRequestDTO(
                     "Club A Renamed",
-                    "club_b_nick"
+                    "club_b_nick",
+                    null
             );
 
             mockMvc.perform(patch("/api/clubs/{id}", club.getId())
@@ -510,7 +519,8 @@ class ClubControllerTest extends IntegrationTestBase {
 
             var request = new UpdateClubRequestDTO(
                     "Club Keep Renamed",
-                    "keep_nick"
+                    "keep_nick",
+                    null
             );
 
             mockMvc.perform(patch("/api/clubs/{id}", club.getId())
@@ -618,6 +628,81 @@ class ClubControllerTest extends IntegrationTestBase {
 
             mockMvc.perform(delete("/api/clubs/{id}", club.getId()))
                     .andExpect(status().isUnauthorized());
+        }
+    }
+
+    // ── GET /api/clubs/search?q= ───────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("GET /api/clubs/search")
+    class SearchClubs {
+
+        @Test
+        @DisplayName("deve retornar clubes ativos que contem o termo no nome")
+        void searchByName() throws Exception {
+            User user = createActiveUser("search_name@club.com", "search_name");
+            createClub("Ferino FC", "ferino");
+            createClub("Outro Clube", "outro_clube");
+
+            mockMvc.perform(get("/api/clubs/search").param("q", "ferino")
+                            .header("Authorization", bearerToken(user)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$", hasSize(1)))
+                    .andExpect(jsonPath("$[0].name", is("Ferino FC")))
+                    .andExpect(jsonPath("$[0].joinPolicy", is("INVITE_ONLY")));
+        }
+
+        @Test
+        @DisplayName("deve retornar clubes que contem o termo no nickname")
+        void searchByNickname() throws Exception {
+            User user = createActiveUser("search_nick@club.com", "search_nick");
+            createClub("Time Azul", "azul_fc");
+            createClub("Time Vermelho", "vermelho_fc");
+
+            mockMvc.perform(get("/api/clubs/search").param("q", "azul")
+                            .header("Authorization", bearerToken(user)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$", hasSize(1)))
+                    .andExpect(jsonPath("$[0].nickname", is("azul_fc")));
+        }
+
+        @Test
+        @DisplayName("deve ignorar clubes inativos")
+        void searchExcludesInactive() throws Exception {
+            User user = createActiveUser("search_inactive@club.com", "search_inactive");
+            Club inactive = createClub("Ferino Antigo", "ferino_antigo");
+            inactive.deactivate();
+            clubRepository.save(inactive);
+            createClub("Ferino Novo", "ferino_novo");
+
+            mockMvc.perform(get("/api/clubs/search").param("q", "ferino")
+                            .header("Authorization", bearerToken(user)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$", hasSize(1)))
+                    .andExpect(jsonPath("$[0].nickname", is("ferino_novo")));
+        }
+
+        @Test
+        @DisplayName("deve retornar lista vazia quando nenhum clube corresponde")
+        void searchNoResult() throws Exception {
+            User user = createActiveUser("search_none@club.com", "search_none");
+            createClub("Ferino FC", "ferino");
+
+            mockMvc.perform(get("/api/clubs/search").param("q", "inexistente")
+                            .header("Authorization", bearerToken(user)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$", hasSize(0)));
+        }
+
+        @Test
+        @DisplayName("deve retornar 400 quando termo excede 100 caracteres")
+        void searchTooLong() throws Exception {
+            User user = createActiveUser("search_long@club.com", "search_long");
+            String q = "a".repeat(101);
+
+            mockMvc.perform(get("/api/clubs/search").param("q", q)
+                            .header("Authorization", bearerToken(user)))
+                    .andExpect(status().isBadRequest());
         }
     }
 }
