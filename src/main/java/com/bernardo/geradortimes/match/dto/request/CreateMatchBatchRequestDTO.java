@@ -35,7 +35,6 @@ public record CreateMatchBatchRequestDTO(
                 example = "2026-07-01"
         )
         @NotNull
-        @FutureOrPresent
         LocalDate startDate,
 
         @Schema(
@@ -45,7 +44,6 @@ public record CreateMatchBatchRequestDTO(
                 example = "2026-07-31"
         )
         @NotNull
-        @FutureOrPresent
         LocalDate endDate,
 
         @Schema(

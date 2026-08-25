@@ -73,7 +73,14 @@ public class MatchService {
 
     public List<MatchResponseDTO> createBatch(CreateMatchBatchRequestDTO request) {
         clubAuthorizationService.requireDirector(request.clubId());
+        LocalDate todayInClubZone = LocalDate.now(request.zoneId());
 
+        if (request.startDate().isBefore(todayInClubZone)) {
+            throw new ResponseStatusException(BAD_REQUEST, "startDate must be today or in the future");
+        }
+        if (request.endDate().isBefore(todayInClubZone)) {
+            throw new ResponseStatusException(BAD_REQUEST, "endDate must be today or in the future");
+        }
         if (request.endDate().isBefore(request.startDate())) {
             throw new ResponseStatusException(BAD_REQUEST, "endDate must be after or equal to startDate");
         }
