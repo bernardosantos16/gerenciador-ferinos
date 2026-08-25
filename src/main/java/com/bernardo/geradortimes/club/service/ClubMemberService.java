@@ -85,14 +85,15 @@ public class ClubMemberService {
         );
         clubMemberRepository.save(clubMember);
         log.info("Membro sem usuario adicionado ao clube - memberId: {}, clubId: {}", clubMember.getId(), clubId);
-        return toResponse(clubMember, true);
+        return toResponse(clubMember, true, null);
     }
 
     public Page<ClubMemberResponseDTO> paginateMembers(UUID clubId, Pageable pageable) {
         clubAuthorizationService.requireMember(clubId);
         boolean isDirector = clubAuthorizationService.isDirector(clubId);
+        UUID ownerUserId = clubRepository.findById(clubId).map(Club::getOwnerUserId).orElse(null);
         Page<ClubMember> members = clubMemberRepository.findByClubId(clubId, pageable);
-        return members.map(member -> toResponse(member, isDirector));
+        return members.map(member -> toResponse(member, isDirector, ownerUserId));
     }
 
     @Transactional
@@ -100,8 +101,9 @@ public class ClubMemberService {
         clubAuthorizationService.requireDirector(clubId);
         ClubMember member = clubMemberRepository.findById(memberId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "member not found"));
+        UUID ownerUserId = clubRepository.findById(clubId).map(Club::getOwnerUserId).orElse(null);
 
-        return toResponse(member, true);
+        return toResponse(member, true, ownerUserId);
     }
 
     @Transactional
@@ -127,9 +129,10 @@ public class ClubMemberService {
         }
 
         ClubMember saved = clubMemberRepository.save(member);
+        UUID ownerUserId = clubRepository.findById(clubId).map(Club::getOwnerUserId).orElse(null);
         log.info("Membro atualizado - memberId: {}, clubId: {}, ratingChanged: {}",
                 memberId, clubId, request.rating() != null);
-        return toResponse(saved, true);
+        return toResponse(saved, true, ownerUserId);
     }
 
     public void promoteMemberToDirector(UUID clubId, Long memberId) {
@@ -184,7 +187,7 @@ public class ClubMemberService {
         log.info("Membro removido do clube - memberId: {}, clubId: {}", memberId, clubId);
     }
 
-    private static ClubMemberResponseDTO toResponse(ClubMember member, boolean includeSensitive) {
+    private static ClubMemberResponseDTO toResponse(ClubMember member, boolean includeSensitive, UUID ownerUserId) {
         return new ClubMemberResponseDTO(
                 member.getId(),
                 member.getUserId(),
@@ -193,7 +196,8 @@ public class ClubMemberService {
                 includeSensitive ? member.getTimesMvp() : null,
                 includeSensitive ? member.getTimesChampion() : null,
                 member.getTeamId(),
-                member.getClubRole()
+                member.getClubRole(),
+                ownerUserId != null && ownerUserId.equals(member.getUserId())
         );
     }
 

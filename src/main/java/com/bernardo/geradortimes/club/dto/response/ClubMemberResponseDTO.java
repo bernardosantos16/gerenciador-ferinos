@@ -12,7 +12,8 @@ public record ClubMemberResponseDTO(
         Integer timesMvp,
         Integer timesChampion,
         Long teamId,
-        ClubRole clubRole
+        ClubRole clubRole,
+        boolean isOwner
 ) {
 }
 

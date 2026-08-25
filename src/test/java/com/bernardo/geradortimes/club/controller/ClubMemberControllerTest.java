@@ -185,6 +185,22 @@ class ClubMemberControllerTest extends IntegrationTestBase {
         }
 
         @Test
+        @DisplayName("deve expor isOwner true apenas para o dono do clube")
+        void listExposesOwner() throws Exception {
+            User owner = createActiveUser("owner_list@test.com", "owner_list");
+            User member = createActiveUser("member_list@test.com", "member_list");
+            Club club = createClubWithOwner("Clube Owner", "clube_owner_list", owner.getId());
+            createClubMember(owner.getId(), club.getId(), ClubRole.DIRECTOR);
+            createClubMember(member.getId(), club.getId(), ClubRole.MEMBER);
+
+            mockMvc.perform(get("/api/clubs/{clubId}/members", club.getId())
+                            .header("Authorization", bearerToken(owner)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[?(@.clubRole == 'DIRECTOR')].isOwner", hasItem(true)))
+                    .andExpect(jsonPath("$.content[?(@.clubRole == 'MEMBER')].isOwner", hasItem(false)));
+        }
+
+        @Test
         @DisplayName("deve retornar 403 quando usuário não pertence ao clube")
         void listForbiddenForOutsider() throws Exception {
             TestContext ctx = setupContext("list_forbidden");
