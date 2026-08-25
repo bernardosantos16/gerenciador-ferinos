@@ -3,8 +3,11 @@ package com.bernardo.geradortimes.club.service;
 import com.bernardo.geradortimes.club.dto.request.AddClubMemberRequestDTO;
 import com.bernardo.geradortimes.club.dto.request.UpdateClubMemberRequestDTO;
 import com.bernardo.geradortimes.club.dto.response.ClubMemberResponseDTO;
+import com.bernardo.geradortimes.club.model.Club;
 import com.bernardo.geradortimes.club.model.ClubMember;
 import com.bernardo.geradortimes.club.repository.ClubMemberRepository;
+import com.bernardo.geradortimes.club.repository.ClubRepository;
+import com.bernardo.geradortimes.shared.api.FieldValidationException;
 import com.bernardo.geradortimes.shared.enums.ClubRole;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -15,6 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.UUID;
 
+import static org.springframework.http.HttpStatus.CONFLICT;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 @Slf4j
@@ -23,13 +27,16 @@ import static org.springframework.http.HttpStatus.NOT_FOUND;
 public class ClubMemberService {
 
     private final ClubMemberRepository clubMemberRepository;
+    private final ClubRepository clubRepository;
     private final ClubAuthorizationService clubAuthorizationService;
 
     public ClubMemberService(
             ClubMemberRepository clubMemberRepository,
+            ClubRepository clubRepository,
             ClubAuthorizationService clubAuthorizationService
     ) {
         this.clubMemberRepository = clubMemberRepository;
+        this.clubRepository = clubRepository;
         this.clubAuthorizationService = clubAuthorizationService;
     }
 
@@ -119,14 +126,51 @@ public class ClubMemberService {
             member.changeTimesMvp(request.timesMvp());
         }
 
-        if (request.clubRole() != null) {
-            member.changeRole(request.clubRole());
-        }
-
         ClubMember saved = clubMemberRepository.save(member);
-        log.info("Membro atualizado - memberId: {}, clubId: {}, roleChanged: {}, ratingChanged: {}",
-                memberId, clubId, request.clubRole() != null, request.rating() != null);
+        log.info("Membro atualizado - memberId: {}, clubId: {}, ratingChanged: {}",
+                memberId, clubId, request.rating() != null);
         return toResponse(saved, true);
+    }
+
+    public void promoteMemberToDirector(UUID clubId, Long memberId) {
+        clubAuthorizationService.requireDirector(clubId);
+        ClubMember member = clubMemberRepository.findByIdForUpdate(memberId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "member not found"));
+        if (!clubId.equals(member.getClubId())) {
+            throw new ResponseStatusException(NOT_FOUND, "member not found");
+        }
+        if (member.getUserId() == null) {
+            throw new FieldValidationException(CONFLICT, "member", "member has no linked user account");
+        }
+        if (member.getClubRole() == ClubRole.DIRECTOR) {
+            throw new FieldValidationException(CONFLICT, "clubRole", "member is already a director");
+        }
+        member.changeRole(ClubRole.DIRECTOR);
+        clubMemberRepository.save(member);
+        log.info("Membro promovido a diretor - memberId: {}, clubId: {}", memberId, clubId);
+    }
+
+    public void demoteDirectorToMember(UUID clubId, Long memberId) {
+        clubAuthorizationService.requireDirector(clubId);
+        ClubMember member = clubMemberRepository.findByIdForUpdate(memberId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "member not found"));
+        if (!clubId.equals(member.getClubId())) {
+            throw new ResponseStatusException(NOT_FOUND, "member not found");
+        }
+        if (member.getUserId() == null) {
+            throw new FieldValidationException(CONFLICT, "member", "member has no linked user account");
+        }
+        if (member.getClubRole() == ClubRole.MEMBER) {
+            throw new FieldValidationException(CONFLICT, "clubRole", "member is already a member");
+        }
+        Club club = clubRepository.findById(clubId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "club not found"));
+        if (member.getUserId().equals(club.getOwnerUserId())) {
+            throw new FieldValidationException(CONFLICT, "clubRole", "cannot demote the club owner");
+        }
+        member.changeRole(ClubRole.MEMBER);
+        clubMemberRepository.save(member);
+        log.info("Membro rebaixado a membro - memberId: {}, clubId: {}", memberId, clubId);
     }
 
     public void removeMember(UUID clubId, Long memberId) {

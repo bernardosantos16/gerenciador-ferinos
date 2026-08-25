@@ -26,6 +26,9 @@ public class Club {
     @Column(name = "created_at")
     private Instant createdAt;
 
+    @Column(name = "owner_user_id")
+    private UUID ownerUserId;
+
     @Enumerated(EnumType.STRING)
     private ActivityStatus status;
 
@@ -57,6 +60,10 @@ public class Club {
 
     public void deactivate() {
         this.status = ActivityStatus.DISABLED;
+    }
+
+    public void assignOwner(UUID userId) {
+        this.ownerUserId = userId;
     }
 
     public void changeName(String name) {

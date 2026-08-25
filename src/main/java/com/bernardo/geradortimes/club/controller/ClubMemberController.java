@@ -125,6 +125,52 @@ public class ClubMemberController {
         return ResponseEntity.ok(clubMemberService.updateMember(clubId, memberId, request));
     }
 
+    @PatchMapping("/{memberId}/promote")
+    @Operation(summary = "Promover membro a diretor")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Membro promovido a diretor."),
+            @ApiResponse(responseCode = "401", description = "Nao autenticado."),
+            @ApiResponse(responseCode = "403", description = "Usuario nao possui permissao (DIRECTOR requerido).",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "404", description = "Membro nao encontrado.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "409", description = "Membro ja e diretor ou nao possui usuario vinculado.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    public ResponseEntity<Void> promoteToDirector(
+            @Parameter(description = "ID do clube.", required = true, example = "c0a8012e-6f1f-4b4b-9f5e-7a8b9c0d1e2f")
+            @PathVariable UUID clubId,
+            @Parameter(description = "ID do membro.", required = true, example = "1")
+            @PathVariable Long memberId
+    ) {
+        log.info("Promovendo membro {} do clube {} a diretor", memberId, clubId);
+        clubMemberService.promoteMemberToDirector(clubId, memberId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/{memberId}/demote")
+    @Operation(summary = "Rebaixar diretor a membro")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Diretor rebaixado a membro."),
+            @ApiResponse(responseCode = "401", description = "Nao autenticado."),
+            @ApiResponse(responseCode = "403", description = "Usuario nao possui permissao (DIRECTOR requerido).",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "404", description = "Membro nao encontrado.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "409", description = "Membro ja e MEMBER, nao possui usuario vinculado ou e o dono do clube.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    public ResponseEntity<Void> demoteToMember(
+            @Parameter(description = "ID do clube.", required = true, example = "c0a8012e-6f1f-4b4b-9f5e-7a8b9c0d1e2f")
+            @PathVariable UUID clubId,
+            @Parameter(description = "ID do membro.", required = true, example = "1")
+            @PathVariable Long memberId
+    ) {
+        log.info("Rebaixando diretor {} do clube {} a membro", memberId, clubId);
+        clubMemberService.demoteDirectorToMember(clubId, memberId);
+        return ResponseEntity.noContent().build();
+    }
+
     @DeleteMapping("/{memberId}")
     @Operation(summary = "Remover membro do clube")
     @ApiResponses({

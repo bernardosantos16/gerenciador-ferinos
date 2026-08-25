@@ -207,7 +207,17 @@ public abstract class IntegrationTestBase {
      * Creates and persists a Club.
      */
     protected Club createClub(String name, String nickname) {
+        return createClubWithOwner(name, nickname, null);
+    }
+
+    /**
+     * Creates and persists a Club with the given owner (the user who created it).
+     */
+    protected Club createClubWithOwner(String name, String nickname, UUID ownerUserId) {
         Club club = Club.create(name, Nickname.of(nickname));
+        if (ownerUserId != null) {
+            club.assignOwner(ownerUserId);
+        }
         return clubRepository.save(club);
     }
 

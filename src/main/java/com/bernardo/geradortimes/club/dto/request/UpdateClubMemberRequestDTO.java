@@ -38,12 +38,6 @@ public record UpdateClubMemberRequestDTO(
                 minimum = "0"
         )
         @Min(0)
-        Integer timesMvp,
-
-        @Schema(
-                description = "Nova role do membro no clube.",
-                example = "DIRECTOR"
-        )
-        ClubRole clubRole
+        Integer timesMvp
 ) {
 }

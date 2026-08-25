@@ -76,6 +76,7 @@ public class ClubService {
                 requestDTO.name().trim(),
                 Nickname.of(nicknameValue)
         );
+        club.assignOwner(userId);
         Club saved = clubRepository.save(club);
 
         // The creator is always a DIRECTOR in the club.

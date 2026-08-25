@@ -30,6 +30,7 @@ class ClubMemberControllerTest extends IntegrationTestBase {
             User member,
             User outsider,
             Club club,
+            ClubMember directorMember,
             ClubMember existingMember
     ) {}
 
@@ -40,10 +41,10 @@ class ClubMemberControllerTest extends IntegrationTestBase {
 
         Club club = createClub("Clube " + suffix, "clube_" + suffix);
 
-        createClubMember(director.getId(), club.getId(), ClubRole.DIRECTOR);
+        ClubMember directorMember = createClubMember(director.getId(), club.getId(), ClubRole.DIRECTOR);
         ClubMember existingMember = createClubMember(member.getId(), club.getId(), ClubRole.MEMBER);
 
-        return new TestContext(director, member, outsider, club, existingMember);
+        return new TestContext(director, member, outsider, club, directorMember, existingMember);
     }
 
     // ── POST /api/clubs/{clubId}/members ─────────────────────────────────────────────
@@ -264,6 +265,180 @@ class ClubMemberControllerTest extends IntegrationTestBase {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(toJson(request)))
                     .andExpect(status().isUnauthorized());
+        }
+    }
+
+    // ── PATCH /api/clubs/{clubId}/members/{memberId}/promote ─────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("PATCH /api/clubs/{clubId}/members/{memberId}/promote")
+    class PromoteMember {
+
+        @Test
+        @DisplayName("deve promover membro a diretor e retornar 204 quando usuário é DIRECTOR")
+        void promoteSuccess() throws Exception {
+            TestContext ctx = setupContext("promote_success");
+
+            mockMvc.perform(patch("/api/clubs/{clubId}/members/{memberId}/promote", ctx.club().getId(), ctx.existingMember().getId())
+                            .header("Authorization", bearerToken(ctx.director())))
+                    .andExpect(status().isNoContent());
+
+            mockMvc.perform(get("/api/clubs/{clubId}/members/{memberId}", ctx.club().getId(), ctx.existingMember().getId())
+                            .header("Authorization", bearerToken(ctx.director())))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.clubRole", is("DIRECTOR")));
+        }
+
+        @Test
+        @DisplayName("deve retornar 403 quando usuário não possui permissão de DIRECTOR")
+        void promoteForbiddenForMember() throws Exception {
+            TestContext ctx = setupContext("promote_forbidden");
+
+            mockMvc.perform(patch("/api/clubs/{clubId}/members/{memberId}/promote", ctx.club().getId(), ctx.existingMember().getId())
+                            .header("Authorization", bearerToken(ctx.member())))
+                    .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("deve retornar 401 quando não autenticado")
+        void promoteUnauthorized() throws Exception {
+            mockMvc.perform(patch("/api/clubs/{clubId}/members/{memberId}/promote", UUID.randomUUID(), 1L))
+                    .andExpect(status().isUnauthorized());
+        }
+
+        @Test
+        @DisplayName("deve retornar 404 quando membro não existe")
+        void promoteNotFound() throws Exception {
+            TestContext ctx = setupContext("promote_not_found");
+
+            mockMvc.perform(patch("/api/clubs/{clubId}/members/{memberId}/promote", ctx.club().getId(), 999999L)
+                            .header("Authorization", bearerToken(ctx.director())))
+                    .andExpect(status().isNotFound());
+        }
+
+        @Test
+        @DisplayName("deve retornar 404 quando membro pertence a outro clube")
+        void promoteCrossClub() throws Exception {
+            TestContext ctx = setupContext("promote_cross_club");
+            TestContext other = setupContext("promote_cross_other");
+
+            mockMvc.perform(patch("/api/clubs/{clubId}/members/{memberId}/promote", ctx.club().getId(), other.existingMember().getId())
+                            .header("Authorization", bearerToken(ctx.director())))
+                    .andExpect(status().isNotFound());
+        }
+
+        @Test
+        @DisplayName("deve retornar 409 quando membro já é diretor")
+        void promoteAlreadyDirector() throws Exception {
+            TestContext ctx = setupContext("promote_already_dir");
+
+            mockMvc.perform(patch("/api/clubs/{clubId}/members/{memberId}/promote", ctx.club().getId(), ctx.directorMember().getId())
+                            .header("Authorization", bearerToken(ctx.director())))
+                    .andExpect(status().isConflict());
+        }
+
+        @Test
+        @DisplayName("deve retornar 409 quando membro não possui usuário vinculado")
+        void promoteNonUserMember() throws Exception {
+            TestContext ctx = setupContext("promote_non_user");
+            ClubMember nonUserMember = createClubMember(null, ctx.club().getId(), ClubRole.MEMBER);
+
+            mockMvc.perform(patch("/api/clubs/{clubId}/members/{memberId}/promote", ctx.club().getId(), nonUserMember.getId())
+                            .header("Authorization", bearerToken(ctx.director())))
+                    .andExpect(status().isConflict());
+        }
+    }
+
+    // ── PATCH /api/clubs/{clubId}/members/{memberId}/demote ─────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("PATCH /api/clubs/{clubId}/members/{memberId}/demote")
+    class DemoteMember {
+
+        private record DemoteContext(
+                User owner,
+                User director2,
+                User member,
+                Club club,
+                ClubMember ownerMember,
+                ClubMember director2Member,
+                ClubMember memberMember
+        ) {}
+
+        private DemoteContext setupDemoteContext(String suffix) {
+            User owner = createActiveUser("owner_" + suffix + "@test.com", "owner_" + suffix);
+            User director2 = createActiveUser("director2_" + suffix + "@test.com", "director2_" + suffix);
+            User member = createActiveUser("member_" + suffix + "@test.com", "member_" + suffix);
+
+            Club club = createClubWithOwner("Clube " + suffix, "clube_" + suffix, owner.getId());
+
+            ClubMember ownerMember = createClubMember(owner.getId(), club.getId(), ClubRole.DIRECTOR);
+            ClubMember director2Member = createClubMember(director2.getId(), club.getId(), ClubRole.DIRECTOR);
+            ClubMember memberMember = createClubMember(member.getId(), club.getId(), ClubRole.MEMBER);
+
+            return new DemoteContext(owner, director2, member, club, ownerMember, director2Member, memberMember);
+        }
+
+        @Test
+        @DisplayName("deve rebaixar diretor a membro e retornar 204 quando usuário é DIRECTOR")
+        void demoteSuccess() throws Exception {
+            DemoteContext ctx = setupDemoteContext("demote_success");
+
+            mockMvc.perform(patch("/api/clubs/{clubId}/members/{memberId}/demote", ctx.club().getId(), ctx.director2Member().getId())
+                            .header("Authorization", bearerToken(ctx.owner())))
+                    .andExpect(status().isNoContent());
+
+            mockMvc.perform(get("/api/clubs/{clubId}/members/{memberId}", ctx.club().getId(), ctx.director2Member().getId())
+                            .header("Authorization", bearerToken(ctx.owner())))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.clubRole", is("MEMBER")));
+        }
+
+        @Test
+        @DisplayName("deve retornar 409 ao tentar rebaixar o dono do clube")
+        void demoteOwner() throws Exception {
+            DemoteContext ctx = setupDemoteContext("demote_owner");
+
+            mockMvc.perform(patch("/api/clubs/{clubId}/members/{memberId}/demote", ctx.club().getId(), ctx.ownerMember().getId())
+                            .header("Authorization", bearerToken(ctx.director2())))
+                    .andExpect(status().isConflict());
+        }
+
+        @Test
+        @DisplayName("deve retornar 403 quando usuário não possui permissão de DIRECTOR")
+        void demoteForbiddenForMember() throws Exception {
+            DemoteContext ctx = setupDemoteContext("demote_forbidden");
+
+            mockMvc.perform(patch("/api/clubs/{clubId}/members/{memberId}/demote", ctx.club().getId(), ctx.director2Member().getId())
+                            .header("Authorization", bearerToken(ctx.member())))
+                    .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("deve retornar 401 quando não autenticado")
+        void demoteUnauthorized() throws Exception {
+            mockMvc.perform(patch("/api/clubs/{clubId}/members/{memberId}/demote", UUID.randomUUID(), 1L))
+                    .andExpect(status().isUnauthorized());
+        }
+
+        @Test
+        @DisplayName("deve retornar 404 quando membro não existe")
+        void demoteNotFound() throws Exception {
+            DemoteContext ctx = setupDemoteContext("demote_not_found");
+
+            mockMvc.perform(patch("/api/clubs/{clubId}/members/{memberId}/demote", ctx.club().getId(), 999999L)
+                            .header("Authorization", bearerToken(ctx.owner())))
+                    .andExpect(status().isNotFound());
+        }
+
+        @Test
+        @DisplayName("deve retornar 409 quando membro já é MEMBER")
+        void demoteAlreadyMember() throws Exception {
+            DemoteContext ctx = setupDemoteContext("demote_already_member");
+
+            mockMvc.perform(patch("/api/clubs/{clubId}/members/{memberId}/demote", ctx.club().getId(), ctx.memberMember().getId())
+                            .header("Authorization", bearerToken(ctx.owner())))
+                    .andExpect(status().isConflict());
         }
     }
 
